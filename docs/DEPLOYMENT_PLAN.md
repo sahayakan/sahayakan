@@ -108,37 +108,50 @@ curl -s -o /dev/null -w "%{http_code}" http://localhost:3000
 
 **Option A — With domain** (e.g., `sahayakan.example.com`):
 
+Same route list as Option B below, but wrapped in a domain block for automatic TLS:
+
 ```
 # /etc/caddy/Caddyfile
 sahayakan.example.com {
-    handle /api/* {
-        reverse_proxy localhost:8000
-    }
-    handle /ws/* {
-        reverse_proxy localhost:8000
-    }
-    handle {
-        reverse_proxy localhost:3000
-    }
+    # Copy all handle directives from Option B
+    handle { reverse_proxy localhost:3000 }
 }
 ```
 
-**Option B — IP-only (no TLS)**:
+**Option B — IP-only (no TLS)** (currently deployed):
+
+Since the API routes are at the root (e.g., `/health`, `/agents`, `/jobs`), each route prefix
+must be explicitly mapped. The catch-all sends everything else to the web UI.
 
 ```
 # /etc/caddy/Caddyfile
 :80 {
-    handle /api/* {
-        reverse_proxy localhost:8000
-    }
-    handle /ws/* {
-        reverse_proxy localhost:8000
-    }
-    handle {
-        reverse_proxy localhost:3000
-    }
+    handle /health        { reverse_proxy localhost:8000 }
+    handle /metrics       { reverse_proxy localhost:8000 }
+    handle /agents/*      { reverse_proxy localhost:8000 }
+    handle /api-keys/*    { reverse_proxy localhost:8000 }
+    handle /audit-log/*   { reverse_proxy localhost:8000 }
+    handle /auth/*        { reverse_proxy localhost:8000 }
+    handle /events/*      { reverse_proxy localhost:8000 }
+    handle /ingestion/*   { reverse_proxy localhost:8000 }
+    handle /insights/*    { reverse_proxy localhost:8000 }
+    handle /jobs/*        { reverse_proxy localhost:8000 }
+    handle /knowledge/*   { reverse_proxy localhost:8000 }
+    handle /logs/*        { reverse_proxy localhost:8000 }
+    handle /schedules/*   { reverse_proxy localhost:8000 }
+    handle /search/*      { reverse_proxy localhost:8000 }
+    handle /teams/*       { reverse_proxy localhost:8000 }
+    handle /usage/*       { reverse_proxy localhost:8000 }
+    handle /webhooks/*    { reverse_proxy localhost:8000 }
+    handle /ws/*          { reverse_proxy localhost:8000 }
+    handle /docs          { reverse_proxy localhost:8000 }
+    handle /openapi.json  { reverse_proxy localhost:8000 }
+
+    handle { reverse_proxy localhost:3000 }
 }
 ```
+
+> When adding new API routes, remember to add the prefix to the Caddyfile.
 
 ```bash
 sudo systemctl restart caddy
@@ -292,13 +305,16 @@ If any step fails during deployment (build failure, health check timeout, curl f
 
 The following was performed to prepare the server for CD (these steps only need to be done once):
 
-1. Installed `git`, `curl`, `docker.io`, `docker-compose` on the Debian 13 server
+1. Installed `git`, `curl`, `docker.io`, `docker-compose`, `caddy`, `ufw`, `fail2ban` on Debian 13
 2. Enabled Docker daemon: `sudo systemctl enable --now docker`
 3. Added `admin` user to `docker` group: `sudo usermod -aG docker admin`
 4. Cloned repo: `git clone https://github.com/sahayakan/sahayakan.git /home/admin/sahayakan`
 5. Created production `.env` with generated passwords (`openssl rand -base64 24`)
 6. Started all services: `docker compose -f docker-compose.prod.yml --env-file ../.env up -d`
-7. Added three GitHub secrets via `gh secret set`
+7. Configured Caddy reverse proxy (IP-only mode, Option B) with all API route prefixes
+8. Configured firewall: `ufw allow 22,80,443/tcp` + deny all other incoming
+9. Enabled fail2ban with SSH jail
+10. Added three GitHub secrets via `gh secret set`
 
 ### 6.7 Checklist
 
@@ -346,9 +362,9 @@ With only 8 GB total disk, space is tight. Priorities:
 - [x] Verify all services healthy
 - [x] Set up GitHub secrets for CD
 - [x] Test CI -> Deploy pipeline end-to-end
-- [ ] Install Caddy, fail2ban
-- [ ] Configure firewall (ufw)
-- [ ] Configure Caddy reverse proxy
+- [x] Install Caddy, fail2ban
+- [x] Configure firewall (ufw) — SSH/80/443 only
+- [x] Configure Caddy reverse proxy — all API routes + web UI on port 80
 - [ ] Set up log rotation
 - [ ] Set up automated backups
 - [ ] Enable unattended security updates
