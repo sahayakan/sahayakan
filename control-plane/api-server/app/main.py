@@ -4,7 +4,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.database import close_db, init_db
-from app.routes import agents, events, ingestion, insights, jobs, knowledge, logs, reviews, schedules, search, usage, webhooks, websocket
+from app.routes import agents, auth, events, ingestion, insights, jobs, knowledge, logs, reviews, schedules, search, usage, webhooks, websocket
 
 
 @asynccontextmanager
@@ -29,6 +29,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+app.include_router(auth.router)
 app.include_router(agents.router)
 app.include_router(jobs.router)
 app.include_router(logs.router)
