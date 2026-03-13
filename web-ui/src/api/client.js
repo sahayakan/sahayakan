@@ -1,9 +1,13 @@
 const API_URL = import.meta.env.VITE_API_URL || '/api';
 
 async function request(path, options = {}) {
+  const headers = { ...options.headers };
+  if (options.body) {
+    headers['Content-Type'] = 'application/json';
+  }
   const res = await fetch(`${API_URL}${path}`, {
-    headers: { 'Content-Type': 'application/json', ...options.headers },
     ...options,
+    headers,
   });
   if (!res.ok) {
     const err = await res.json().catch(() => ({ detail: res.statusText }));
