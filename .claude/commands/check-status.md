@@ -1,8 +1,8 @@
-Check the health and status of the Sahayakan platform.
+Check the health and status of the Sahayakan platform (local development).
 
 Run the following checks and report results:
 
-1. **Container status**: Run `podman-compose -f infrastructure/docker-compose.yml ps` to see which services are running.
+1. **Container status**: Run `cd infrastructure && docker compose --env-file ../.env ps` to see which services are running. If `docker compose` is not available, fall back to `podman-compose -f infrastructure/docker-compose.yml ps`.
 
 2. **API health**: Run `curl -s http://localhost:8000/health` to check the API server health endpoint.
 
@@ -13,3 +13,5 @@ Run the following checks and report results:
 5. **Registered agents**: Run `curl -s http://localhost:8000/agents` to list registered agents.
 
 Summarize the overall platform health based on these results.
+
+For production status, use `/prod-status` instead.
