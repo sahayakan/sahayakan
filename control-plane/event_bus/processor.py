@@ -36,6 +36,7 @@ class EventBusProcessor:
             ("pr-context", "pr.ingested"),
             ("pr-context", "issue.analyzed"),
             ("meeting-summary", "meeting.uploaded"),
+            ("slack-digest", "slack.synced"),
         ]
         for agent_name, event_type in defaults:
             # Only register if agent exists
@@ -136,5 +137,9 @@ class EventBusProcessor:
             transcript_id = payload.get("transcript_id")
             if transcript_id:
                 return {"transcript_id": transcript_id, "source": "event"}
+        elif agent_name == "slack-digest" and event_type == "slack.synced":
+            channel = payload.get("channel")
+            if channel:
+                return {"channel": channel, "source": "event"}
 
         return None

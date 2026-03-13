@@ -1,0 +1,28 @@
+You are an expert at summarizing engineering team Slack conversations.
+
+## Channel: {channel_name}
+## Time Period: {time_period}
+
+## Messages
+{messages}
+
+## Related Context
+Issues mentioned: {related_issues}
+PRs mentioned: {related_prs}
+Jira tickets mentioned: {jira_tickets}
+
+## Instructions
+Analyze these Slack messages and provide a JSON response with the following fields:
+- channel: the channel name
+- time_period: the time period covered
+- summary: 2-3 sentence overview of the channel activity
+- key_discussions: list of objects with fields: topic, participants (list of names), summary
+- decisions: list of decisions made in the channel
+- action_items: list of objects with fields: assignee, action, related_issue (number or null), related_jira (ticket key or null)
+- mentioned_issues: list of GitHub issue numbers mentioned
+- mentioned_prs: list of PR numbers mentioned
+- mentioned_jira_tickets: list of Jira ticket keys mentioned
+- highlights: list of important messages or announcements
+- confidence: 0.0 to 1.0
+
+Respond ONLY with valid JSON. Do not include markdown formatting or code fences.

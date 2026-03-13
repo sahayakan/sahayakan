@@ -17,6 +17,7 @@ from agents.dummy.agent import DummyAgent
 from agents.issue_triage.agent import IssueTriageAgent
 from agents.pr_context.agent import PRContextAgent
 from agents.meeting_summary.agent import MeetingSummaryAgent
+from agents.slack_digest.agent import SlackDigestAgent
 
 
 def get_llm_client():
@@ -44,6 +45,7 @@ def get_agent_registry() -> dict:
         "issue-triage": IssueTriageAgent,
         "pr-context": PRContextAgent,
         "meeting-summary": MeetingSummaryAgent,
+        "slack-digest": SlackDigestAgent,
     }
 
 

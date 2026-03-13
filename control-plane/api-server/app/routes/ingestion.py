@@ -28,6 +28,12 @@ class JiraSyncRequest(BaseModel):
     project_key: str
 
 
+class SlackSyncRequest(BaseModel):
+    channel_id: str
+    channel_name: str
+    since_ts: str | None = None
+
+
 def _setup_paths():
     """Add project paths for ingestion imports."""
     project_root = Path(__file__).parent.parent.parent.parent.parent
@@ -133,3 +139,58 @@ async def jira_status():
     return {
         "tickets_cached": len(list(tickets_dir.glob("*.json"))) if tickets_dir.exists() else 0,
     }
+
+
+@router.post("/slack/sync")
+async def slack_sync(request: SlackSyncRequest):
+    token = os.environ.get("SLACK_BOT_TOKEN")
+    if not token:
+        raise HTTPException(status_code=500, detail="SLACK_BOT_TOKEN not set")
+
+    try:
+        _setup_paths()
+        from ingestion.slack_fetcher.fetcher import SlackFetcher
+    except ImportError:
+        raise HTTPException(status_code=501, detail="Slack ingestion modules not available")
+
+    cache = _get_knowledge_cache()
+    fetcher = SlackFetcher(token=token, knowledge_cache=cache)
+    result = fetcher.sync_channel(
+        channel_id=request.channel_id,
+        channel_name=request.channel_name,
+        since_ts=request.since_ts,
+    )
+
+    # Publish slack.synced event
+    try:
+        from app.database import get_pool
+        pool = await get_pool()
+        import json as _json
+        await pool.execute(
+            "INSERT INTO events (event_type, source, payload) "
+            "VALUES ('slack.synced', 'slack-ingestion', $1::jsonb)",
+            _json.dumps({"channel": request.channel_name, "messages": result.messages_synced}),
+        )
+    except Exception:
+        pass
+
+    return {
+        "status": "completed" if not result.errors else "completed_with_errors",
+        "channel": result.channel,
+        "messages_synced": result.messages_synced,
+        "errors": result.errors,
+        "timestamp": result.timestamp,
+    }
+
+
+@router.get("/slack/status")
+async def slack_status():
+    slack_dir = Path(settings.knowledge_cache_path) / "slack" / "channels"
+    if not slack_dir.exists():
+        return {"channels": [], "total_files": 0}
+    channels = []
+    for d in sorted(slack_dir.iterdir()):
+        if d.is_dir():
+            files = list(d.glob("*.json"))
+            channels.append({"name": d.name, "files": len(files)})
+    return {"channels": channels, "total_files": sum(c["files"] for c in channels)}
