@@ -85,3 +85,50 @@ async def get_job(job_id: int):
     if isinstance(result["parameters"], str):
         result["parameters"] = json.loads(result["parameters"])
     return result
+
+
+@router.get("/{job_id}/runs")
+async def get_job_runs(job_id: int):
+    """Get agent runs for a job, including artifacts and LLM usage."""
+    pool = await get_pool()
+
+    # Verify job exists
+    job = await pool.fetchrow("SELECT id FROM jobs WHERE id = $1", job_id)
+    if not job:
+        raise HTTPException(status_code=404, detail=f"Job {job_id} not found")
+
+    runs = await pool.fetch(
+        "SELECT id, job_id, agent_name, status, start_time, end_time, git_commit, logs_uri "
+        "FROM agent_runs WHERE job_id = $1 ORDER BY start_time DESC",
+        job_id,
+    )
+
+    results = []
+    for run in runs:
+        run_dict = dict(run)
+        run_id = run["id"]
+
+        # Fetch artifacts for this run
+        artifacts = await pool.fetch(
+            "SELECT id, artifact_type, storage_uri, metadata, created_at "
+            "FROM artifacts WHERE run_id = $1 ORDER BY created_at",
+            run_id,
+        )
+        run_dict["artifacts"] = []
+        for a in artifacts:
+            ad = dict(a)
+            if isinstance(ad.get("metadata"), str):
+                ad["metadata"] = json.loads(ad["metadata"])
+            run_dict["artifacts"].append(ad)
+
+        # Fetch LLM usage for this run
+        usage_rows = await pool.fetch(
+            "SELECT id, model, tokens_input, tokens_output, latency_ms, estimated_cost, created_at "
+            "FROM llm_usage WHERE run_id = $1 ORDER BY created_at",
+            run_id,
+        )
+        run_dict["llm_usage"] = [dict(u) for u in usage_rows]
+
+        results.append(run_dict)
+
+    return {"job_id": job_id, "runs": results}

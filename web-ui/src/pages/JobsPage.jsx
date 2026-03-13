@@ -105,10 +105,12 @@ function JobDetail() {
   const jobId = parseInt(id);
   const { data: job, refresh } = usePolling(useCallback(() => api.get(`/jobs/${jobId}`), [jobId]), 3000);
   const { data: reviewStatus } = usePolling(useCallback(() => api.get(`/jobs/${jobId}/review-status`), [jobId]), 3000);
+  const { data: runsData } = usePolling(useCallback(() => api.get(`/jobs/${jobId}/runs`), [jobId]), 5000);
   const { logs } = useWebSocket(jobId);
   const { data: archivedLogs } = usePolling(useCallback(() => api.get(`/logs/${jobId}?limit=500`), [jobId]), 5000);
 
   const allLogs = logs.length > 0 ? logs : (archivedLogs?.logs || []);
+  const runs = runsData?.runs || [];
 
   const [reviewComment, setReviewComment] = useState('');
 
@@ -173,6 +175,60 @@ function JobDetail() {
           </Grid>
         )}
       </Grid>
+
+      {runs.length > 0 && (
+        <Box sx={{ mb: 2 }}>
+          {runs.map((run) => (
+            <Card key={run.id} sx={{ mb: 2 }}>
+              <CardContent>
+                <Typography variant="h6" gutterBottom>Run #{run.id}</Typography>
+                <Grid container spacing={2}>
+                  <Grid size={{ xs: 12, md: 6 }}>
+                    <Typography><strong>Status:</strong> <StatusChip status={run.status} /></Typography>
+                    {run.start_time && <Typography><strong>Started:</strong> {new Date(run.start_time).toLocaleString()}</Typography>}
+                    {run.end_time && <Typography><strong>Ended:</strong> {new Date(run.end_time).toLocaleString()}</Typography>}
+                    {run.start_time && run.end_time && (
+                      <Typography><strong>Duration:</strong> {((new Date(run.end_time) - new Date(run.start_time)) / 1000).toFixed(1)}s</Typography>
+                    )}
+                    {run.git_commit && <Typography><strong>Commit:</strong> <code>{run.git_commit.slice(0, 8)}</code></Typography>}
+                  </Grid>
+                  <Grid size={{ xs: 12, md: 6 }}>
+                    {run.llm_usage.length > 0 && (
+                      <Box>
+                        <Typography variant="subtitle2" gutterBottom>LLM Usage</Typography>
+                        {run.llm_usage.map((u, i) => (
+                          <Box key={i} sx={{ mb: 0.5 }}>
+                            <Typography variant="body2"><strong>Model:</strong> {u.model}</Typography>
+                            <Typography variant="body2">
+                              Tokens: {u.tokens_input} in / {u.tokens_output} out
+                              {u.latency_ms > 0 && ` | ${u.latency_ms}ms`}
+                            </Typography>
+                          </Box>
+                        ))}
+                      </Box>
+                    )}
+                  </Grid>
+                </Grid>
+                {run.artifacts.length > 0 && (
+                  <Box sx={{ mt: 1 }}>
+                    <Typography variant="subtitle2" gutterBottom>Artifacts</Typography>
+                    <List dense>
+                      {run.artifacts.map((a) => (
+                        <ListItem key={a.id}>
+                          <ListItemText
+                            primary={a.storage_uri}
+                            secondary={`${a.artifact_type} | ${new Date(a.created_at).toLocaleString()}`}
+                          />
+                        </ListItem>
+                      ))}
+                    </List>
+                  </Box>
+                )}
+              </CardContent>
+            </Card>
+          ))}
+        </Box>
+      )}
 
       <LogViewer logs={allLogs} />
     </Box>

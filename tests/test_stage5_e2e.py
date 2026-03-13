@@ -2,6 +2,7 @@
 
 import asyncio
 import json
+import os
 import sys
 
 sys.path.insert(0, "data-plane")
@@ -60,11 +61,11 @@ MEETING_MOCK = json.dumps(
 
 async def main():
     pool = await asyncpg.create_pool(
-        user="sahayakan",
-        password="sahayakan_dev_password",
-        database="sahayakan",
-        host="localhost",
-        port=5433,
+        user=os.environ.get("POSTGRES_USER", "sahayakan"),
+        password=os.environ.get("POSTGRES_PASSWORD", "sahayakan_dev_password"),
+        database=os.environ.get("POSTGRES_DB", "sahayakan"),
+        host=os.environ.get("POSTGRES_HOST", "localhost"),
+        port=int(os.environ.get("POSTGRES_PORT", "5433")),
         min_size=1,
         max_size=5,
     )
