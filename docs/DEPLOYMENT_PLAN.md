@@ -376,5 +376,5 @@ With only 8 GB total disk, space is tight. Priorities:
 - [x] Point domain (`ai.helm-team.org`) and enable HTTPS via Let's Encrypt
 - [x] Set up log rotation — Docker daemon: 10MB max, 3 files per container
 - [x] Set up automated backups — daily at 3 AM UTC, 7-day retention
-- [ ] Enable unattended security updates
+- [x] Enable unattended security updates — daily apt update + auto-install + weekly autoclean
 - [ ] (Optional) Attach EBS volume for data
