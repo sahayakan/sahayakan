@@ -1,0 +1,28 @@
+import { BrowserRouter, Routes, Route } from 'react-router-dom';
+import { ThemeProvider, CssBaseline } from '@mui/material';
+import theme from './theme';
+import MainLayout from './components/Layout/MainLayout';
+import DashboardPage from './pages/DashboardPage';
+import JobsPage from './pages/JobsPage';
+import AgentsPage from './pages/AgentsPage';
+import ReportsPage from './pages/ReportsPage';
+
+export default function App() {
+  return (
+    <ThemeProvider theme={theme}>
+      <CssBaseline />
+      <BrowserRouter>
+        <Routes>
+          <Route element={<MainLayout />}>
+            <Route path="/" element={<DashboardPage />} />
+            <Route path="/jobs" element={<JobsPage />} />
+            <Route path="/jobs/:id" element={<JobsPage />} />
+            <Route path="/agents" element={<AgentsPage />} />
+            <Route path="/reports" element={<ReportsPage />} />
+            <Route path="/reports/:type/:id" element={<ReportsPage />} />
+          </Route>
+        </Routes>
+      </BrowserRouter>
+    </ThemeProvider>
+  );
+}
