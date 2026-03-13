@@ -88,32 +88,44 @@ python3 -m cli.main usage                      # LLM usage summary
 | **issue-triage** | GitHub issue | Priority, duplicates, related PRs, suggested actions |
 | **pr-context** | Pull request | Risk level, linked issues, review suggestions |
 | **meeting-summary** | Meeting transcript | Action items, decisions, key topics |
+| **slack-digest** | Slack channel | Key discussions, decisions, action items |
+| **insights** | All analyses | Recurring patterns, tech debt signals |
+| **trend-analysis** | All metrics | Health score, risk areas, recommendations |
 
 ## Key Features
 
 - **Autonomous execution** with optional human review gates at any stage
 - **Complete audit trail**: every action produces a Git commit, database record, and event
 - **Event-driven orchestration**: agents trigger each other through the event bus
+- **Semantic search** across knowledge base via pgvector embeddings
+- **Slack integration**: ingest channels, post results, digest summaries
+- **Scheduled automation**: cron-based scheduling, GitHub webhooks
+- **Insights engine**: pattern detection and trend analysis
+- **Authentication**: API keys with RBAC scopes and audit logging
 - **Real-time log streaming** via WebSocket
 - **LLM cost tracking** with per-agent and per-model breakdowns
+- **Prometheus metrics** at `/metrics` endpoint
+- **Kubernetes-ready** with Helm chart
 
 ## Project Structure
 
 ```
 sahayakan/
-+-- control-plane/          # API server, event bus
++-- control-plane/          # API server, event bus, scheduler
 |   +-- api-server/         # FastAPI application
 |   +-- event_bus/          # Event processor
+|   +-- scheduler/          # Cron-based job scheduler
+|   +-- notifications/      # Slack notifier
 +-- data-plane/             # Agent execution engine
-|   +-- agent_runner/       # Runner, contracts, knowledge cache
-|   +-- agents/             # Issue triage, PR context, meeting summary
+|   +-- agent_runner/       # Runner, contracts, knowledge cache, embeddings
+|   +-- agents/             # 6 agents (triage, PR, meeting, slack, insights, trends)
 |   +-- llm_client/         # Gemini client (Vertex AI)
 |   +-- prompts/            # Version-controlled prompt templates
-+-- ingestion/              # GitHub and Jira data fetchers
++-- ingestion/              # GitHub, Jira, and Slack data fetchers
 +-- knowledge-cache/        # Git-based knowledge repository
 +-- web-ui/                 # React + Material UI dashboard
 +-- cli/                    # Command-line tool
-+-- infrastructure/         # Docker Compose, migrations
++-- infrastructure/         # Docker Compose, Helm chart, migrations, scripts
 +-- tests/                  # Unit, integration, e2e tests
 +-- docs/                   # Architecture and stage plans
 ```

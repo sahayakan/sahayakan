@@ -1,0 +1,80 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Release.Name }}-api-server
+  labels:
+    app: sahayakan
+    component: api-server
+spec:
+  replicas: {{ .Values.apiServer.replicas }}
+  selector:
+    matchLabels:
+      app: sahayakan
+      component: api-server
+  template:
+    metadata:
+      labels:
+        app: sahayakan
+        component: api-server
+    spec:
+      containers:
+        - name: api-server
+          image: "{{ .Values.apiServer.image.repository }}:{{ .Values.apiServer.image.tag }}"
+          ports:
+            - containerPort: {{ .Values.apiServer.port }}
+          env:
+            - name: POSTGRES_HOST
+              value: {{ .Release.Name }}-postgresql
+            - name: POSTGRES_PORT
+              value: "5432"
+            - name: POSTGRES_USER
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Release.Name }}-db-secret
+                  key: username
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Release.Name }}-db-secret
+                  key: password
+            - name: POSTGRES_DB
+              value: {{ .Values.postgresql.auth.database }}
+            - name: MINIO_ENDPOINT
+              value: {{ .Release.Name }}-minio:9000
+            - name: AUTH_ENABLED
+              value: {{ .Values.apiServer.env.AUTH_ENABLED | quote }}
+            - name: KNOWLEDGE_CACHE_PATH
+              value: /data/knowledge-cache
+          resources:
+            {{- toYaml .Values.apiServer.resources | nindent 12 }}
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: {{ .Values.apiServer.port }}
+            initialDelaySeconds: 10
+            periodSeconds: 15
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: {{ .Values.apiServer.port }}
+            initialDelaySeconds: 5
+            periodSeconds: 5
+          volumeMounts:
+            - name: knowledge-cache
+              mountPath: /data/knowledge-cache
+      volumes:
+        - name: knowledge-cache
+          persistentVolumeClaim:
+            claimName: {{ .Release.Name }}-knowledge-cache
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .Release.Name }}-api-server
+spec:
+  selector:
+    app: sahayakan
+    component: api-server
+  ports:
+    - port: {{ .Values.apiServer.port }}
+      targetPort: {{ .Values.apiServer.port }}

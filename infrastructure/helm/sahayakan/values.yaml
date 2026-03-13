@@ -1,0 +1,113 @@
+# Sahayakan Helm Chart Values
+
+# API Server
+apiServer:
+  replicas: 2
+  image:
+    repository: sahayakan/api-server
+    tag: latest
+    pullPolicy: IfNotPresent
+  port: 8000
+  resources:
+    limits:
+      memory: 512Mi
+      cpu: "1"
+    requests:
+      memory: 256Mi
+      cpu: "250m"
+  env:
+    AUTH_ENABLED: "true"
+
+# Agent Runner
+agentRunner:
+  replicas: 2
+  image:
+    repository: sahayakan/agent-runner
+    tag: latest
+    pullPolicy: IfNotPresent
+  resources:
+    limits:
+      memory: 1Gi
+      cpu: "1"
+    requests:
+      memory: 512Mi
+      cpu: "500m"
+
+# Event Bus Processor
+eventBus:
+  replicas: 1
+  image:
+    repository: sahayakan/event-bus
+    tag: latest
+    pullPolicy: IfNotPresent
+  resources:
+    limits:
+      memory: 256Mi
+      cpu: "500m"
+
+# Scheduler
+scheduler:
+  replicas: 1
+  image:
+    repository: sahayakan/scheduler
+    tag: latest
+    pullPolicy: IfNotPresent
+  resources:
+    limits:
+      memory: 256Mi
+      cpu: "500m"
+
+# Web UI
+webUI:
+  replicas: 1
+  image:
+    repository: sahayakan/web-ui
+    tag: latest
+    pullPolicy: IfNotPresent
+  port: 3000
+
+# PostgreSQL
+postgresql:
+  enabled: true
+  image:
+    repository: pgvector/pgvector
+    tag: pg16
+  auth:
+    username: sahayakan
+    password: ""  # Set via secret
+    database: sahayakan
+  persistence:
+    size: 10Gi
+
+# MinIO
+minio:
+  enabled: true
+  auth:
+    rootUser: sahayakan
+    rootPassword: ""  # Set via secret
+  persistence:
+    size: 20Gi
+
+# Vertex AI
+vertexai:
+  project: ""
+  location: us-central1
+  # serviceAccountKey: base64-encoded service account JSON
+
+# Ingress
+ingress:
+  enabled: false
+  className: nginx
+  hosts:
+    - host: sahayakan.example.com
+      paths:
+        - path: /
+          pathType: Prefix
+  tls: []
+
+# Autoscaling for agent runners
+autoscaling:
+  enabled: false
+  minReplicas: 1
+  maxReplicas: 5
+  targetCPUUtilization: 70

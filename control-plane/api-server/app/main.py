@@ -2,6 +2,7 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import PlainTextResponse
 
 from app.database import close_db, init_db
 from app.routes import agents, auth, events, ingestion, insights, jobs, knowledge, logs, reviews, schedules, search, usage, webhooks, websocket
@@ -55,3 +56,10 @@ async def health():
         "database": "connected" if db_ok else "disconnected",
         "version": "0.1.0",
     }
+
+
+@app.get("/metrics", response_class=PlainTextResponse)
+async def metrics():
+    from app.metrics import metrics_collector
+
+    return await metrics_collector.collect()

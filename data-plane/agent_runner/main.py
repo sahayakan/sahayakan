@@ -78,6 +78,12 @@ async def main():
         llm_client=llm_client,
     )
 
+    # Handle SIGTERM for graceful shutdown
+    import signal
+    loop = asyncio.get_event_loop()
+    for sig in (signal.SIGTERM, signal.SIGINT):
+        loop.add_signal_handler(sig, lambda: asyncio.create_task(runner.stop()))
+
     try:
         await runner.start()
     except KeyboardInterrupt:

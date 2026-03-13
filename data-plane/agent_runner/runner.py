@@ -32,7 +32,12 @@ class AgentRunner:
 
     async def start(self) -> None:
         self.running = True
+        self._current_job_id = None
         print("[Runner] Started polling for jobs", flush=True)
+
+        # Recover stale running jobs from previous crashes
+        await self._recover_stale_jobs()
+
         while self.running:
             try:
                 await self._poll_and_execute()
@@ -42,7 +47,22 @@ class AgentRunner:
 
     async def stop(self) -> None:
         self.running = False
+        if self._current_job_id:
+            print(f"[Runner] Graceful shutdown: waiting for job {self._current_job_id}", flush=True)
         print("[Runner] Stopped", flush=True)
+
+    async def _recover_stale_jobs(self) -> None:
+        """Reset jobs stuck in 'running' status from a previous crash."""
+        rows = await self.pool.fetch(
+            "SELECT id FROM jobs WHERE status = 'running'"
+        )
+        for row in rows:
+            await self.pool.execute(
+                "UPDATE jobs SET status = 'pending', started_at = NULL WHERE id = $1",
+                row["id"],
+            )
+        if rows:
+            print(f"[Runner] Recovered {len(rows)} stale job(s)", flush=True)
 
     async def _poll_and_execute(self) -> None:
         row = await self.pool.fetchrow(
