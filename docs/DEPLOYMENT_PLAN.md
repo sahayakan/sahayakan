@@ -388,21 +388,32 @@ Monitor disk usage: `df -h / /data` and `docker system df`
 
 ## Authentication
 
-Auth is enforced via middleware on all routes except public ones (`/health`, `/docs`, `/openapi.json`, `/redoc`).
+Two layers of auth protect the site:
 
-**API key**: Pass via `Authorization: Bearer <key>` header.
+### Layer 1: Caddy Basic Auth
 
-**Admin key** (`admin-master`): Created during initial setup. The key value is stored only
-in the production `.env` — it is **not** in version control. If lost, a new key must be
-created directly in the database.
+The entire site is gated behind HTTP basic auth at the Caddy level. This prevents
+unauthorized access to both the web UI and all API endpoints.
 
-**Scopes**: `read`, `write`, `admin`. Admin scope grants full access.
+- **Username**: `admin`
+- **Password**: stored in `.env.local` (not in version control)
+- **Excluded**: `/health` — remains open for the CD pipeline health check
+- **Config**: `/etc/caddy/Caddyfile` uses a named matcher `@notHealth` to skip auth on `/health`
+
+### Layer 2: API Key Auth
+
+API endpoints additionally require an API key via `Authorization: Bearer <key>` header.
+This is enforced by middleware in the API server when `AUTH_ENABLED=true`.
+
+- **Public routes** (no API key needed): `/health`, `/docs`, `/openapi.json`, `/redoc`
+- **Scopes**: `read`, `write`, `admin`. Admin scope grants full access.
+- **Admin key** (`admin-master`): stored in `.env.local` as `SAHAYAKAN_ADMIN_API_KEY`
 
 To create additional keys (requires the admin key):
 
 ```bash
-curl -X POST https://ai.helm-team.org/api-keys \
-  -H "Authorization: Bearer <admin-key>" \
+curl -u admin:<basic-auth-pass> -X POST https://ai.helm-team.org/api-keys \
+  -H "Authorization: Bearer <admin-api-key>" \
   -H "Content-Type: application/json" \
   -d '{"name": "my-key", "scopes": ["read", "write"]}'
 ```
