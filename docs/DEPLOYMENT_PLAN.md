@@ -19,11 +19,14 @@ sudo apt install -y git curl wget ufw fail2ban
 ### 1.2 Install Docker & Docker Compose
 
 ```bash
-sudo apt install -y docker.io docker-compose-plugin
+sudo apt install -y docker.io docker-compose
 sudo systemctl enable --now docker
 sudo usermod -aG docker admin
-# Re-login for group to take effect
+# Re-login for group to take effect (or use `sg docker -c '...'` for immediate access)
 ```
+
+> **Note**: On Debian 13, the package is `docker-compose` (not `docker-compose-plugin`).
+> Docker Compose v2 is included and accessible as `docker compose` (subcommand).
 
 ### 1.3 Firewall Setup
 
@@ -53,9 +56,12 @@ sudo apt install -y caddy
 
 ```bash
 cd /home/admin
-git clone git@github.com:sahayakan/sahayakan.git
+git clone https://github.com/sahayakan/sahayakan.git
 cd sahayakan
 ```
+
+> The repo is public, so HTTPS clone works without authentication.
+> The CD pipeline uses `git fetch origin main` over HTTPS.
 
 ### 2.2 Create Production `.env`
 
@@ -243,9 +249,20 @@ The CD pipeline chains off the existing CI workflow. When CI passes on `main`, a
 
 **Flow**: Push to `main` -> CI (lint + test) -> Deploy (if CI passes)
 
-### 6.2 GitHub Secrets Setup
+### 6.2 GitHub Secrets Setup (One-Time)
 
-Three secrets must be configured in the GitHub repository settings (Settings > Secrets and variables > Actions):
+Three secrets must be configured in the GitHub repository. This was done via `gh` CLI:
+
+```bash
+# Set SSH private key
+gh secret set DEPLOY_SSH_KEY < ~/.ssh/baijumk1.pem --repo sahayakan/sahayakan
+
+# Set server IP
+echo "13.126.248.229" | gh secret set DEPLOY_SERVER_IP --repo sahayakan/sahayakan
+
+# Set SSH known hosts (prevents MITM attacks)
+ssh-keyscan 13.126.248.229 2>/dev/null | gh secret set DEPLOY_SSH_KNOWN_HOSTS --repo sahayakan/sahayakan
+```
 
 | Secret | Value |
 |---|---|
@@ -271,13 +288,28 @@ If any step fails during deployment (build failure, health check timeout, curl f
 - **Commit message**: Include `[skip deploy]` in the commit message to skip deployment even if CI passes.
 - **Branch**: Pushes to non-`main` branches never trigger deployment (CI runs but deploy does not).
 
-### 6.6 Checklist
+### 6.6 Server One-Time Setup
 
-- [ ] Add `DEPLOY_SSH_KEY` secret to GitHub repo
-- [ ] Add `DEPLOY_SERVER_IP` secret to GitHub repo
-- [ ] Add `DEPLOY_SSH_KNOWN_HOSTS` secret to GitHub repo
-- [ ] Push a commit to `main` and verify CI -> Deploy chain
-- [ ] Verify services after automated deploy
+The following was performed to prepare the server for CD (these steps only need to be done once):
+
+1. Installed `git`, `curl`, `docker.io`, `docker-compose` on the Debian 13 server
+2. Enabled Docker daemon: `sudo systemctl enable --now docker`
+3. Added `admin` user to `docker` group: `sudo usermod -aG docker admin`
+4. Cloned repo: `git clone https://github.com/sahayakan/sahayakan.git /home/admin/sahayakan`
+5. Created production `.env` with generated passwords (`openssl rand -base64 24`)
+6. Started all services: `docker compose -f docker-compose.prod.yml --env-file ../.env up -d`
+7. Added three GitHub secrets via `gh secret set`
+
+### 6.7 Checklist
+
+- [x] Add `DEPLOY_SSH_KEY` secret to GitHub repo
+- [x] Add `DEPLOY_SERVER_IP` secret to GitHub repo
+- [x] Add `DEPLOY_SSH_KNOWN_HOSTS` secret to GitHub repo
+- [x] Install git, docker, docker-compose on server
+- [x] Clone repo and create production `.env` on server
+- [x] Start services on server
+- [x] Push a commit to `main` and verify CI -> Deploy chain
+- [x] Verify services after automated deploy
 
 ---
 
@@ -307,16 +339,18 @@ With only 8 GB total disk, space is tight. Priorities:
 
 ## Checklist
 
-- [ ] SSH into server and update system
-- [ ] Install Docker, Docker Compose, Caddy, fail2ban
+- [x] SSH into server and update system
+- [x] Install Docker, Docker Compose
+- [x] Clone repo and create production `.env`
+- [x] Start services with `docker-compose.prod.yml`
+- [x] Verify all services healthy
+- [x] Set up GitHub secrets for CD
+- [x] Test CI -> Deploy pipeline end-to-end
+- [ ] Install Caddy, fail2ban
 - [ ] Configure firewall (ufw)
-- [ ] Clone repo and create production `.env`
-- [ ] Start services with `docker-compose.prod.yml`
 - [ ] Configure Caddy reverse proxy
-- [ ] Verify all services healthy
 - [ ] Set up log rotation
 - [ ] Set up automated backups
 - [ ] Enable unattended security updates
-- [ ] Test deploy script from local machine
 - [ ] (Optional) Attach EBS volume for data
 - [ ] (Optional) Point domain and enable HTTPS
