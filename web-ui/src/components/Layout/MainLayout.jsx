@@ -9,6 +9,7 @@ import WorkIcon from '@mui/icons-material/Work';
 import SmartToyIcon from '@mui/icons-material/SmartToy';
 import DescriptionIcon from '@mui/icons-material/Description';
 import TimelineIcon from '@mui/icons-material/Timeline';
+import SearchIcon from '@mui/icons-material/Search';
 import MenuIcon from '@mui/icons-material/Menu';
 
 const DRAWER_WIDTH = 220;
@@ -18,6 +19,7 @@ const NAV_ITEMS = [
   { label: 'Jobs', path: '/jobs', icon: <WorkIcon /> },
   { label: 'Agents', path: '/agents', icon: <SmartToyIcon /> },
   { label: 'Reports', path: '/reports', icon: <DescriptionIcon /> },
+  { label: 'Search', path: '/search', icon: <SearchIcon /> },
   { label: 'Events', path: '/events', icon: <TimelineIcon /> },
 ];
 

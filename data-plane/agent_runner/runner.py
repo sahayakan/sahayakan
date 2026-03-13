@@ -21,11 +21,13 @@ class AgentRunner:
         knowledge_cache: KnowledgeCache,
         agent_registry: dict[str, type],
         llm_client=None,
+        embedding_service=None,
     ):
         self.pool = db_pool
         self.cache = knowledge_cache
         self.agent_registry = agent_registry
         self.llm_client = llm_client
+        self.embedding_service = embedding_service
         self.running = False
 
     async def start(self) -> None:
@@ -174,16 +176,15 @@ class AgentRunner:
         agent_cls = self.agent_registry.get(agent_name)
         if not agent_cls:
             raise ValueError(f"Unknown agent: {agent_name}")
-        # Pass llm_client if the agent constructor accepts it
+        # Build kwargs based on what the agent constructor accepts
         import inspect
         sig = inspect.signature(agent_cls.__init__)
+        kwargs = {"knowledge_cache": self.cache, "logger": logger}
         if "llm_client" in sig.parameters:
-            return agent_cls(
-                knowledge_cache=self.cache,
-                logger=logger,
-                llm_client=self.llm_client,
-            )
-        return agent_cls(knowledge_cache=self.cache, logger=logger)
+            kwargs["llm_client"] = self.llm_client
+        if "embedding_service" in sig.parameters:
+            kwargs["embedding_service"] = self.embedding_service
+        return agent_cls(**kwargs)
 
     async def _update_run_status(
         self, run_id: int, status: str, git_commit: str | None = None

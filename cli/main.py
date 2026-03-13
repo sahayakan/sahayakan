@@ -276,5 +276,46 @@ def events_list(limit, event_type):
         click.echo(f"{e['id']:<6} {e['event_type']:<25} {e['source']:<20} {e['created_at'][:19]}")
 
 
+# --- Knowledge commands ---
+
+@cli.group()
+def knowledge():
+    """Knowledge base operations."""
+    pass
+
+
+@knowledge.command("search")
+@click.argument("query")
+@click.option("--type", "source_type", multiple=True, help="Filter by type (issue, pr, jira, report)")
+@click.option("--limit", default=10)
+def knowledge_search(query, source_type, limit):
+    """Semantic search across the knowledge base."""
+    body = {"query": query, "limit": limit}
+    if source_type:
+        body["types"] = list(source_type)
+    data = api.post("/knowledge/search", body)
+    results = data.get("results", [])
+    if not results:
+        click.echo("No results found.")
+        if data.get("total_embeddings", 0) == 0:
+            click.echo("Hint: run 'sahayakan knowledge backfill' to index existing content.")
+        return
+    click.echo(f"{'Score':<8} {'Type':<10} {'ID':<20} {'Info'}")
+    click.echo("-" * 65)
+    for r in results:
+        meta = r.get("metadata") or {}
+        info = meta.get("title") or meta.get("summary") or ""
+        click.echo(f"{r['similarity']:<8.3f} {r['source_type']:<10} {r['source_id']:<20} {info[:30]}")
+
+
+@knowledge.command("stats")
+def knowledge_stats():
+    """Show embedding statistics."""
+    data = api.get("/knowledge/search/stats")
+    click.echo(f"Total embeddings: {data.get('total_embeddings', 0)}")
+    for t, c in data.get("by_type", {}).items():
+        click.echo(f"  {t}: {c}")
+
+
 if __name__ == "__main__":
     cli()

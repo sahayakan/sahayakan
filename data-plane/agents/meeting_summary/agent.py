@@ -14,10 +14,11 @@ PROMPT_PATH = Path(__file__).parent.parent.parent / "prompts" / "meeting_summary
 
 
 class MeetingSummaryAgent(BaseAgent):
-    def __init__(self, knowledge_cache: KnowledgeCache, logger: AgentLogger, llm_client: LLMClient | None = None):
+    def __init__(self, knowledge_cache: KnowledgeCache, logger: AgentLogger, llm_client: LLMClient | None = None, embedding_service=None):
         self.cache = knowledge_cache
         self.log = logger
         self.llm = llm_client
+        self.embedding_service = embedding_service
         self.input: AgentInput | None = None
         self.transcript_id: str = ""
         self.transcript_text: str = ""

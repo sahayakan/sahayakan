@@ -24,10 +24,12 @@ class IssueTriageAgent(BaseAgent):
         knowledge_cache: KnowledgeCache,
         logger: AgentLogger,
         llm_client: LLMClient | None = None,
+        embedding_service=None,
     ):
         self.cache = knowledge_cache
         self.log = logger
         self.llm = llm_client
+        self.embedding_service = embedding_service
         self.input: AgentInput | None = None
         self.issue_data: dict = {}
         self.context: dict = {}
@@ -53,6 +55,56 @@ class IssueTriageAgent(BaseAgent):
         )
 
     def collect_context(self) -> None:
+        if self.embedding_service:
+            self._collect_context_semantic()
+        else:
+            self._collect_context_keyword()
+
+    def _collect_context_semantic(self) -> None:
+        """Use semantic search for context collection."""
+        import asyncio
+
+        issue_num = self.issue_data["number"]
+        query = f"{self.issue_data.get('title', '')} {self.issue_data.get('body', '') or ''}"
+
+        async def _search():
+            from agent_runner.semantic_context import (
+                find_similar_issues, find_related_prs,
+                find_related_jira, find_related_reports,
+            )
+            similar = await find_similar_issues(
+                self.embedding_service, query,
+                exclude_id=str(issue_num), limit=10,
+            )
+            prs = await find_related_prs(self.embedding_service, query, limit=10)
+            jira = await find_related_jira(self.embedding_service, query, limit=10)
+            reports = await find_related_reports(self.embedding_service, query, limit=5)
+            return similar, prs, jira, reports
+
+        similar, prs, jira, reports = asyncio.get_event_loop().run_until_complete(_search())
+
+        similar_issues = [
+            {"number": int(r["source_id"]), "summary": (r.get("metadata") or {}).get("title", ""), "similarity": r["similarity"]}
+            for r in similar
+        ]
+        related_prs = [
+            {"number": int(r["source_id"]), "title": (r.get("metadata") or {}).get("title", ""), "similarity": r["similarity"]}
+            for r in prs
+        ]
+        related_jira = [
+            {"key": r["source_id"], "summary": (r.get("metadata") or {}).get("summary", ""), "similarity": r["similarity"]}
+            for r in jira
+        ]
+        self.log.info(f"Semantic search: {len(similar_issues)} similar issues, {len(related_prs)} related PRs, {len(related_jira)} Jira tickets")
+
+        self.context = {
+            "similar_issues": similar_issues,
+            "related_prs": related_prs,
+            "related_jira": related_jira,
+        }
+
+    def _collect_context_keyword(self) -> None:
+        """Fallback: keyword-based context collection."""
         issue_num = self.issue_data["number"]
         issue_title = self.issue_data.get("title", "").lower()
         issue_body = (self.issue_data.get("body") or "").lower()
@@ -90,7 +142,6 @@ class IssueTriageAgent(BaseAgent):
                 pr_body = (pr.get("body") or "").lower()
                 pr_text = f"{pr_title} {pr_body}"
 
-                # Check if PR references this issue
                 if f"#{issue_num}" in pr_text:
                     related_prs.append({
                         "number": pr["number"],
@@ -99,7 +150,6 @@ class IssueTriageAgent(BaseAgent):
                     })
                     continue
 
-                # Check keyword overlap
                 pr_keywords = set(re.findall(r'\b[a-z]{3,}\b', pr_text))
                 overlap = keywords & pr_keywords
                 if len(overlap) > 5:
@@ -123,7 +173,6 @@ class IssueTriageAgent(BaseAgent):
                     f"{ticket.get('description', '')}"
                 ).lower()
 
-                # Check if issue body mentions this ticket
                 ticket_key = ticket.get("key", "")
                 if ticket_key and ticket_key.lower() in issue_body:
                     related_jira.append({
@@ -133,7 +182,6 @@ class IssueTriageAgent(BaseAgent):
                     })
                     continue
 
-                # Check keyword overlap
                 jira_keywords = set(
                     re.findall(r'\b[a-z]{3,}\b', ticket_text)
                 )

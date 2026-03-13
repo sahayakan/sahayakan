@@ -14,10 +14,11 @@ PROMPT_PATH = Path(__file__).parent.parent.parent / "prompts" / "pr_context.prom
 
 
 class PRContextAgent(BaseAgent):
-    def __init__(self, knowledge_cache: KnowledgeCache, logger: AgentLogger, llm_client: LLMClient | None = None):
+    def __init__(self, knowledge_cache: KnowledgeCache, logger: AgentLogger, llm_client: LLMClient | None = None, embedding_service=None):
         self.cache = knowledge_cache
         self.log = logger
         self.llm = llm_client
+        self.embedding_service = embedding_service
         self.input: AgentInput | None = None
         self.pr_data: dict = {}
         self.context: dict = {}

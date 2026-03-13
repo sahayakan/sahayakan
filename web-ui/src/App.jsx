@@ -7,6 +7,7 @@ import JobsPage from './pages/JobsPage';
 import AgentsPage from './pages/AgentsPage';
 import ReportsPage from './pages/ReportsPage';
 import EventsPage from './pages/EventsPage';
+import SearchPage from './pages/SearchPage';
 
 export default function App() {
   return (
@@ -22,6 +23,7 @@ export default function App() {
             <Route path="/reports" element={<ReportsPage />} />
             <Route path="/reports/:type/:id" element={<ReportsPage />} />
             <Route path="/events" element={<EventsPage />} />
+            <Route path="/search" element={<SearchPage />} />
           </Route>
         </Routes>
       </BrowserRouter>
