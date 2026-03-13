@@ -57,7 +57,7 @@ jobs:
             git reset --hard "$PREV_SHA"
             cd infrastructure
             docker compose -f docker-compose.prod.yml --env-file ../.env up -d --build --no-deps api-server
-            docker compose -f docker-compose.prod.yml --env-file ../.env build --no-cache web-ui
+            docker compose -f docker-compose.prod.yml --env-file ../.env build --build-arg CACHEBUST=$(date +%s) web-ui
             docker compose -f docker-compose.prod.yml --env-file ../.env up -d --no-deps web-ui
             echo "Rollback complete. Services restored to $PREV_SHA"
             exit 1
@@ -99,9 +99,9 @@ jobs:
           curl -sf http://localhost:8000/health || { echo "API /health failed"; false; }
           echo " API OK"
 
-          # Rebuild web-ui (--no-cache to bust Docker layer cache)
+          # Rebuild web-ui (CACHEBUST arg invalidates COPY+build layers)
           echo "Rebuilding web-ui..."
-          docker compose -f docker-compose.prod.yml --env-file ../.env build --no-cache web-ui
+          docker compose -f docker-compose.prod.yml --env-file ../.env build --build-arg CACHEBUST=$(date +%s) web-ui
           docker compose -f docker-compose.prod.yml --env-file ../.env up -d --no-deps web-ui
 
           # Wait briefly for web-ui to start

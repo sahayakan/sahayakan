@@ -30,9 +30,9 @@ Parse "$ARGUMENTS" for an optional `--prod` flag. The service name is the non-fl
 
 1. Read `.env.local` to get SSH_KEY_PATH and AWS_SERVER_IP.
 2. If service argument is empty or blank, default to "api-server".
-3. For `web-ui`, use `build --no-cache` then `up -d` to bust Docker layer cache:
+3. For `web-ui`, use `--build-arg CACHEBUST` to bust Docker layer cache for COPY+build steps:
    ```
-   ssh -i {SSH_KEY_PATH} admin@{AWS_SERVER_IP} "cd ~/sahayakan/infrastructure && docker compose -f docker-compose.prod.yml --env-file ../.env build --no-cache web-ui && docker compose -f docker-compose.prod.yml --env-file ../.env up -d --no-deps web-ui"
+   ssh -i {SSH_KEY_PATH} admin@{AWS_SERVER_IP} "cd ~/sahayakan/infrastructure && docker compose -f docker-compose.prod.yml --env-file ../.env build --build-arg CACHEBUST=$(date +%s) web-ui && docker compose -f docker-compose.prod.yml --env-file ../.env up -d --no-deps web-ui"
    ```
 4. For other services, rebuild normally:
    ```

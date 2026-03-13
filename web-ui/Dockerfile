@@ -3,6 +3,7 @@ FROM node:20-slim AS build
 WORKDIR /app
 COPY package*.json ./
 RUN npm ci
+ARG CACHEBUST=1
 COPY . .
 ENV VITE_API_URL=/api
 RUN npm run build

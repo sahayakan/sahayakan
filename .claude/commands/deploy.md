@@ -13,10 +13,10 @@ Read `.env.local` to get SSH_KEY_PATH and AWS_SERVER_IP. Then perform the follow
    ```
 
 3. **Rebuild services** (api-server and web-ui only, keeps postgres/minio running).
-   For web-ui, use `build --no-cache` then `up -d` to bust Docker layer cache:
+   For web-ui, use `--build-arg CACHEBUST` to bust Docker layer cache for COPY+build steps:
    ```
    ssh -i {SSH_KEY_PATH} admin@{AWS_SERVER_IP} "cd ~/sahayakan/infrastructure && docker compose -f docker-compose.prod.yml --env-file ../.env up -d --build --no-deps api-server"
-   ssh -i {SSH_KEY_PATH} admin@{AWS_SERVER_IP} "cd ~/sahayakan/infrastructure && docker compose -f docker-compose.prod.yml --env-file ../.env build --no-cache web-ui && docker compose -f docker-compose.prod.yml --env-file ../.env up -d --no-deps web-ui"
+   ssh -i {SSH_KEY_PATH} admin@{AWS_SERVER_IP} "cd ~/sahayakan/infrastructure && docker compose -f docker-compose.prod.yml --env-file ../.env build --build-arg CACHEBUST=$(date +%s) web-ui && docker compose -f docker-compose.prod.yml --env-file ../.env up -d --no-deps web-ui"
    ```
 
 4. **Wait and verify health** (up to 60 seconds):
