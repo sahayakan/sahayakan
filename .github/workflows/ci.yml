@@ -1,0 +1,42 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install ruff
+        run: pip install ruff
+      - name: Lint
+        run: ruff check control-plane/ data-plane/ cli/ tests/
+      - name: Format check
+        run: ruff format --check control-plane/ data-plane/ cli/ tests/
+
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install dependencies
+        run: pip install -e ".[dev]"
+      - name: Agent contract tests
+        run: python tests/unit/test_agent_contract.py
+      - name: Knowledge cache tests
+        run: python tests/unit/test_knowledge_cache.py
+      - name: Sanitization tests
+        run: python tests/unit/test_sanitize.py
+      - name: Structural tests
+        run: python tests/unit/test_structural.py
+      - name: Convention tests
+        run: python tests/unit/test_conventions.py

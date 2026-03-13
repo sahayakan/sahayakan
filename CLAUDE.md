@@ -40,6 +40,30 @@ sys.path.insert(0, "data-plane")
 - **Migrations**: `infrastructure/db/migrations/` numbered `001_` through `005_`
 - **Next migration number**: 006
 
+## Development Setup
+
+```bash
+# First-time setup (creates venv, installs deps, pre-commit hooks)
+bash setup.sh
+# Or:
+make setup
+```
+
+## Common Commands (Makefile)
+
+```bash
+make lint       # ruff check + format check
+make format     # auto-fix formatting and lint issues
+make test       # run all unit + structural + convention tests
+make test-e2e   # run E2E tests (require running DB)
+make run        # start all containers
+make stop       # stop all containers
+make rebuild    # rebuild a service (SVC=api-server by default)
+make logs       # tail logs (SVC=api-server by default)
+make migrate    # apply all SQL migrations
+make check      # lint + test (full pre-merge check)
+```
+
 ## Container Commands
 
 ```bash
@@ -59,9 +83,14 @@ Environment variables are in `.env` at the project root.
 
 Tests use standalone scripts (no pytest). Run with:
 ```bash
-# Unit tests
+# All unit tests (includes structural + convention tests)
+make test
+
+# Individual test files
 python tests/unit/test_agent_contract.py
 python tests/unit/test_knowledge_cache.py
+python tests/unit/test_structural.py
+python tests/unit/test_conventions.py
 
 # E2E tests (require running DB)
 python tests/test_issue_triage_e2e.py

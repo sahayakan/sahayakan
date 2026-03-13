@@ -18,4 +18,18 @@ dev = [
     "uvicorn[standard]>=0.34",
     "pydantic>=2.10",
     "pydantic-settings>=2.7",
+    "ruff>=0.9.0",
+    "pre-commit>=4.0",
 ]
+
+[tool.ruff]
+target-version = "py312"
+line-length = 120
+src = ["control-plane/api-server", "data-plane", "cli", "tests"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "W", "UP", "B", "SIM"]
+ignore = ["E501"]
+
+[tool.ruff.format]
+quote-style = "double"
