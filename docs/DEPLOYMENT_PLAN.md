@@ -374,7 +374,7 @@ With only 8 GB total disk, space is tight. Priorities:
 - [x] Configure firewall (ufw) — SSH/80/443 only
 - [x] Configure Caddy reverse proxy — all API routes + web UI on port 80
 - [x] Point domain (`ai.helm-team.org`) and enable HTTPS via Let's Encrypt
-- [ ] Set up log rotation
+- [x] Set up log rotation — Docker daemon: 10MB max, 3 files per container
 - [ ] Set up automated backups
 - [ ] Enable unattended security updates
 - [ ] (Optional) Attach EBS volume for data
