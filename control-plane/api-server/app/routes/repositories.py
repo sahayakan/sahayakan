@@ -65,7 +65,7 @@ async def update_repository(repo_id: int, repo: RepositoryUpdate):
         raise HTTPException(status_code=400, detail="No fields to update")
 
     set_clauses = [f"{k} = ${i + 1}" for i, k in enumerate(updates)]
-    set_clauses.append(f"updated_at = NOW()")
+    set_clauses.append("updated_at = NOW()")
     values = list(updates.values())
     values.append(repo_id)
 
