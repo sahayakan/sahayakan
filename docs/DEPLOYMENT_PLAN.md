@@ -1,6 +1,7 @@
 # Sahayakan Deployment Plan
 
 **Target Server**: Debian 13 (trixie) on AWS
+**Domain**: `ai.helm-team.org`
 **IP**: 13.126.248.229
 **SSH**: `ssh -i ~/.ssh/baijumk1.pem admin@13.126.248.229`
 **Resources**: 8 GB RAM, 8 GB disk
@@ -106,19 +107,26 @@ curl -s -o /dev/null -w "%{http_code}" http://localhost:3000
 > If a domain is available, Caddy provides automatic HTTPS.
 > Without a domain, use IP-based access on port 80 only.
 
-**Option A — With domain** (e.g., `sahayakan.example.com`):
+**Option A — With domain** (`ai.helm-team.org`) (currently deployed):
 
-Same route list as Option B below, but wrapped in a domain block for automatic TLS:
+Same route list as Option B below, but wrapped in a domain block.
+Caddy automatically provisions and renews a Let's Encrypt TLS certificate.
+HTTP requests are redirected to HTTPS (308).
 
 ```
 # /etc/caddy/Caddyfile
-sahayakan.example.com {
-    # Copy all handle directives from Option B
-    handle { reverse_proxy localhost:3000 }
+ai.helm-team.org {
+    handle /health {
+        reverse_proxy localhost:8000
+    }
+    # ... all other API route handles (same as Option B) ...
+    handle {
+        reverse_proxy localhost:3000
+    }
 }
 ```
 
-**Option B — IP-only (no TLS)** (currently deployed):
+**Option B — IP-only (no TLS)**:
 
 Since the API routes are at the root (e.g., `/health`, `/agents`, `/jobs`), each route prefix
 must be explicitly mapped. The catch-all sends everything else to the web UI.
@@ -365,8 +373,8 @@ With only 8 GB total disk, space is tight. Priorities:
 - [x] Install Caddy, fail2ban
 - [x] Configure firewall (ufw) — SSH/80/443 only
 - [x] Configure Caddy reverse proxy — all API routes + web UI on port 80
+- [x] Point domain (`ai.helm-team.org`) and enable HTTPS via Let's Encrypt
 - [ ] Set up log rotation
 - [ ] Set up automated backups
 - [ ] Enable unattended security updates
 - [ ] (Optional) Attach EBS volume for data
-- [ ] (Optional) Point domain and enable HTTPS
