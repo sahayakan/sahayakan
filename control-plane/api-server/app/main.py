@@ -4,7 +4,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.database import close_db, init_db
-from app.routes import agents, events, ingestion, jobs, knowledge, logs, reviews, search, usage, websocket
+from app.routes import agents, events, ingestion, jobs, knowledge, logs, reviews, schedules, search, usage, webhooks, websocket
 
 
 @asynccontextmanager
@@ -36,8 +36,10 @@ app.include_router(knowledge.router)
 app.include_router(reviews.router)
 app.include_router(ingestion.router)
 app.include_router(events.router)
+app.include_router(schedules.router)
 app.include_router(search.router)
 app.include_router(usage.router)
+app.include_router(webhooks.router)
 app.include_router(websocket.router)
 
 

@@ -317,5 +317,80 @@ def knowledge_stats():
         click.echo(f"  {t}: {c}")
 
 
+# --- Schedule commands ---
+
+@cli.group()
+def schedule():
+    """Manage scheduled jobs."""
+    pass
+
+
+@schedule.command("list")
+def schedule_list():
+    """List all schedules."""
+    data = api.get("/schedules")
+    schedules = data.get("schedules", [])
+    if not schedules:
+        click.echo("No schedules configured.")
+        return
+    click.echo(f"{'ID':<5} {'Name':<25} {'Type':<15} {'Cron':<20} {'Enabled':<8} {'Next Run'}")
+    click.echo("-" * 95)
+    for s in schedules:
+        next_run = s.get("next_run_at", "-")
+        if next_run and next_run != "-":
+            next_run = next_run[:19]
+        click.echo(f"{s['id']:<5} {s['name']:<25} {s['schedule_type']:<15} {s['cron_expression']:<20} {'Yes' if s['enabled'] else 'No':<8} {next_run}")
+
+
+@schedule.command("create")
+@click.argument("name")
+@click.option("--agent", help="Agent name (for agent_job type)")
+@click.option("--type", "stype", default="agent_job", help="Schedule type")
+@click.option("--cron", required=True, help="Cron expression (e.g., '*/10 * * * *')")
+@click.option("--param", multiple=True, help="Parameters as key=value")
+def schedule_create(name, agent, stype, cron, param):
+    """Create a new schedule."""
+    params = {}
+    for p in param:
+        k, v = p.split("=", 1)
+        params[k] = v
+    body = {
+        "name": name,
+        "agent_name": agent,
+        "schedule_type": stype,
+        "cron_expression": cron,
+        "parameters": params,
+    }
+    result = api.post("/schedules", body)
+    click.echo(f"Schedule #{result['id']} created: {result['name']}")
+    click.echo(f"Next run: {result.get('next_run_at', 'N/A')}")
+
+
+@schedule.command("delete")
+@click.argument("schedule_id", type=int)
+def schedule_delete(schedule_id):
+    """Delete a schedule."""
+    api.post(f"/schedules/{schedule_id}", None)  # Will use DELETE via direct call
+    # Actually need to use a different approach since api_client only has get/post/put
+    import urllib.request
+    req = urllib.request.Request(
+        f"{api.API_URL}/schedules/{schedule_id}", method="DELETE"
+    )
+    try:
+        urllib.request.urlopen(req)
+        click.echo(f"Schedule #{schedule_id} deleted.")
+    except Exception as e:
+        click.echo(f"Error: {e}")
+
+
+@schedule.command("toggle")
+@click.argument("schedule_id", type=int)
+@click.option("--enable/--disable", default=True)
+def schedule_toggle(schedule_id, enable):
+    """Enable or disable a schedule."""
+    api.put(f"/schedules/{schedule_id}", {"enabled": enable})
+    click.echo(f"Schedule #{schedule_id} {'enabled' if enable else 'disabled'}.")
+
+
 if __name__ == "__main__":
     cli()
