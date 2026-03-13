@@ -1,0 +1,112 @@
+name: Deploy
+
+on:
+  workflow_run:
+    workflows: ["CI"]
+    types: [completed]
+    branches: [main]
+
+concurrency:
+  group: deploy-production
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    if: >
+      github.event.workflow_run.conclusion == 'success' &&
+      github.event.workflow_run.head_branch == 'main' &&
+      !contains(github.event.workflow_run.head_commit.message, '[skip deploy]')
+
+    steps:
+      - name: Set up SSH key
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.DEPLOY_SSH_KEY }}" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          echo "${{ secrets.DEPLOY_SSH_KNOWN_HOSTS }}" > ~/.ssh/known_hosts
+
+      - name: Deploy to production
+        env:
+          SERVER: ${{ secrets.DEPLOY_SERVER_IP }}
+        run: |
+          ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=yes admin@"$SERVER" bash -s <<'REMOTE_SCRIPT'
+          set -euo pipefail
+          cd /home/admin/sahayakan
+
+          # Record current commit for rollback
+          PREV_SHA=$(git rev-parse HEAD)
+          echo "Previous commit: $PREV_SHA"
+
+          # Fetch latest changes
+          git fetch origin main
+
+          # Check if there are new changes
+          if [ "$(git rev-parse HEAD)" = "$(git rev-parse origin/main)" ]; then
+            echo "Already up to date. Nothing to deploy."
+            exit 0
+          fi
+
+          # Update to latest
+          git reset --hard origin/main
+          NEW_SHA=$(git rev-parse HEAD)
+          echo "Deploying commit: $NEW_SHA"
+
+          # Function to rollback on failure
+          rollback() {
+            echo "DEPLOY FAILED — rolling back to $PREV_SHA"
+            cd /home/admin/sahayakan
+            git reset --hard "$PREV_SHA"
+            cd infrastructure
+            docker compose -f docker-compose.prod.yml --env-file ../.env up -d --build --no-deps api-server
+            docker compose -f docker-compose.prod.yml --env-file ../.env up -d --build --no-deps web-ui
+            echo "Rollback complete. Services restored to $PREV_SHA"
+            exit 1
+          }
+          trap rollback ERR
+
+          cd infrastructure
+
+          # Rebuild api-server (keep postgres/minio running)
+          echo "Rebuilding api-server..."
+          docker compose -f docker-compose.prod.yml --env-file ../.env up -d --build --no-deps api-server
+
+          # Wait for api-server healthcheck (up to 60s)
+          echo "Waiting for api-server health..."
+          for i in $(seq 1 12); do
+            if docker compose -f docker-compose.prod.yml exec -T api-server python3 -c "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')" 2>/dev/null; then
+              echo "api-server healthy after $((i * 5))s"
+              break
+            fi
+            if [ "$i" -eq 12 ]; then
+              echo "api-server failed healthcheck after 60s"
+              false
+            fi
+            sleep 5
+          done
+
+          # Verify API health from host
+          curl -sf http://localhost:8000/health || { echo "API /health failed"; false; }
+          echo " API OK"
+
+          # Rebuild web-ui
+          echo "Rebuilding web-ui..."
+          docker compose -f docker-compose.prod.yml --env-file ../.env up -d --build --no-deps web-ui
+
+          # Wait briefly for web-ui to start
+          sleep 5
+
+          # Verify web-ui
+          curl -sf -o /dev/null http://localhost:3000 || { echo "web-ui health failed"; false; }
+          echo "web-ui OK"
+
+          # Catch any config changes (new services, updated depends_on, etc.)
+          docker compose -f docker-compose.prod.yml --env-file ../.env up -d
+
+          # Cleanup
+          docker image prune -f
+          echo ""
+          echo "=== Deploy complete ==="
+          echo "Commit: $NEW_SHA"
+          df -h / | tail -1
+          REMOTE_SCRIPT
