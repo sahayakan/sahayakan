@@ -350,14 +350,19 @@ The following was performed to prepare the server for CD (these steps only need 
 
 ---
 
-## Disk Considerations
+## Disk Layout
 
-With only 8 GB total disk, space is tight. Priorities:
+A 100GB EBS volume (`vol-0d5c096c225e7d210`) is attached as `/dev/xvdf` and mounted at `/data`:
 
-1. Consider attaching an EBS volume for `/home/admin/backups` and Docker volumes
-2. Monitor disk usage: `df -h /` and `docker system df`
-3. Prune unused images regularly: `docker image prune -f`
-4. Keep backup retention short (7 days) or offload to S3
+| Path | Contents |
+|---|---|
+| `/data/docker` | Docker data-root (images, containers, volumes) |
+| `/data/backups` | Daily database backups (symlinked from `/home/admin/backups`) |
+
+The root disk (8GB) holds only the OS, packages, and repo checkout. The fstab entry uses
+`LABEL=sahayakan-data` with `nofail` so the server boots even if the volume is detached.
+
+Monitor disk usage: `df -h / /data` and `docker system df`
 
 ---
 
@@ -377,4 +382,4 @@ With only 8 GB total disk, space is tight. Priorities:
 - [x] Set up log rotation — Docker daemon: 10MB max, 3 files per container
 - [x] Set up automated backups — daily at 3 AM UTC, 7-day retention
 - [x] Enable unattended security updates — daily apt update + auto-install + weekly autoclean
-- [ ] (Optional) Attach EBS volume for data
+- [x] Attach EBS volume (`vol-0d5c096c225e7d210`, 100GB) mounted at `/data`
