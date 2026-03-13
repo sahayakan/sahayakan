@@ -4,10 +4,6 @@ Exposes key metrics at /metrics endpoint in Prometheus text format.
 No external dependency required - generates text format directly.
 """
 
-import time
-from collections import defaultdict
-from datetime import datetime, timezone
-
 from app.database import get_pool
 
 
@@ -21,9 +17,7 @@ class MetricsCollector:
         lines.append("")
 
         # Job metrics
-        rows = await pool.fetch(
-            "SELECT status, COUNT(*) as count FROM jobs GROUP BY status"
-        )
+        rows = await pool.fetch("SELECT status, COUNT(*) as count FROM jobs GROUP BY status")
         lines.append("# HELP sahayakan_jobs_total Total jobs by status")
         lines.append("# TYPE sahayakan_jobs_total gauge")
         for r in rows:
@@ -31,16 +25,13 @@ class MetricsCollector:
 
         # Agent run metrics
         rows = await pool.fetch(
-            "SELECT agent_name, status, COUNT(*) as count "
-            "FROM agent_runs GROUP BY agent_name, status"
+            "SELECT agent_name, status, COUNT(*) as count FROM agent_runs GROUP BY agent_name, status"
         )
         lines.append("")
         lines.append("# HELP sahayakan_agent_runs_total Agent runs by agent and status")
         lines.append("# TYPE sahayakan_agent_runs_total gauge")
         for r in rows:
-            lines.append(
-                f'sahayakan_agent_runs_total{{agent="{r["agent_name"]}",status="{r["status"]}"}} {r["count"]}'
-            )
+            lines.append(f'sahayakan_agent_runs_total{{agent="{r["agent_name"]}",status="{r["status"]}"}} {r["count"]}')
 
         # Agent execution time
         rows = await pool.fetch(
@@ -91,9 +82,7 @@ class MetricsCollector:
                 lines.append(f'sahayakan_llm_latency_ms{{model="{r["model"]}"}} {r["avg_latency"]:.0f}')
 
         # Event bus metrics
-        unprocessed = await pool.fetchval(
-            "SELECT COUNT(*) FROM events WHERE processed = FALSE"
-        )
+        unprocessed = await pool.fetchval("SELECT COUNT(*) FROM events WHERE processed = FALSE")
         total_events = await pool.fetchval("SELECT COUNT(*) FROM events")
         lines.append("")
         lines.append("# HELP sahayakan_events_total Total events")
@@ -105,9 +94,7 @@ class MetricsCollector:
         lines.append(f"sahayakan_events_unprocessed {unprocessed}")
 
         # Insights
-        active_insights = await pool.fetchval(
-            "SELECT COUNT(*) FROM insights WHERE status = 'active'"
-        )
+        active_insights = await pool.fetchval("SELECT COUNT(*) FROM insights WHERE status = 'active'")
         lines.append("")
         lines.append("# HELP sahayakan_insights_active Active insights count")
         lines.append("# TYPE sahayakan_insights_active gauge")

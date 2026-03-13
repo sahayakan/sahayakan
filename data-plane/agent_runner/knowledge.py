@@ -2,7 +2,7 @@
 
 import json
 import subprocess
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 
@@ -79,7 +79,7 @@ class KnowledgeCache:
                 check=True,
             )
 
-        timestamp = datetime.now(timezone.utc).isoformat()
+        timestamp = datetime.now(UTC).isoformat()
         full_message = f"[AI-Agent] {agent_name}: {message}"
         if agent_name or job_id or source:
             full_message += "\n"
@@ -91,7 +91,7 @@ class KnowledgeCache:
                 full_message += f"\nSource: {source}"
             full_message += f"\nTimestamp: {timestamp}"
 
-        result = subprocess.run(
+        subprocess.run(
             ["git", "commit", "-m", full_message, "--allow-empty"],
             cwd=self.base_path,
             capture_output=True,

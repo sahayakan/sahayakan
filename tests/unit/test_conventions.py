@@ -60,9 +60,7 @@ def test_route_files_export_router():
 def test_agent_init_signature():
     """Agent __init__ must accept knowledge_cache and logger parameters."""
     agent_dirs = [
-        d for d in os.listdir(AGENTS_DIR)
-        if os.path.isdir(os.path.join(AGENTS_DIR, d))
-        and not d.startswith("__")
+        d for d in os.listdir(AGENTS_DIR) if os.path.isdir(os.path.join(AGENTS_DIR, d)) and not d.startswith("__")
     ]
 
     for agent_dir in agent_dirs:
@@ -78,12 +76,8 @@ def test_agent_init_signature():
                 if not (isinstance(item, ast.FunctionDef) and item.name == "__init__"):
                     continue
                 arg_names = [a.arg for a in item.args.args]
-                assert "knowledge_cache" in arg_names, (
-                    f"Agent {agent_dir} __init__ missing 'knowledge_cache' parameter"
-                )
-                assert "logger" in arg_names, (
-                    f"Agent {agent_dir} __init__ missing 'logger' parameter"
-                )
+                assert "knowledge_cache" in arg_names, f"Agent {agent_dir} __init__ missing 'knowledge_cache' parameter"
+                assert "logger" in arg_names, f"Agent {agent_dir} __init__ missing 'logger' parameter"
 
 
 def test_no_hardcoded_credentials():
@@ -111,9 +105,7 @@ def test_no_hardcoded_credentials():
                 # Allow os.environ.get() defaults with known dev passwords
                 if any(exc in match for exc in CREDENTIAL_EXCEPTIONS):
                     continue
-                raise AssertionError(
-                    f"Possible hardcoded credential in {py_file}: {match}"
-                )
+                raise AssertionError(f"Possible hardcoded credential in {py_file}: {match}")
 
 
 def test_prompt_templates_use_placeholder_syntax():

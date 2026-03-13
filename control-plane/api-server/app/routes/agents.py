@@ -1,5 +1,3 @@
-import json
-
 from fastapi import APIRouter, HTTPException
 
 from app.database import get_pool
@@ -22,8 +20,7 @@ async def list_agents():
 async def get_agent(name: str):
     pool = await get_pool()
     row = await pool.fetchrow(
-        "SELECT id, name, version, description, container_image, "
-        "created_at, updated_at FROM agents WHERE name = $1",
+        "SELECT id, name, version, description, container_image, created_at, updated_at FROM agents WHERE name = $1",
         name,
     )
     if not row:
@@ -50,6 +47,6 @@ async def register_agent(agent: AgentRegister):
             raise HTTPException(
                 status_code=409,
                 detail=f"Agent '{agent.name}' already registered",
-            )
+            ) from e
         raise
     return dict(row)

@@ -1,6 +1,7 @@
 """Sahayakan CLI - command-line tool for the agent platform."""
 
 import json
+
 import click
 
 from cli import api_client as api
@@ -13,6 +14,7 @@ def cli():
 
 
 # --- System ---
+
 
 @cli.command()
 def status():
@@ -34,6 +36,7 @@ def usage():
 
 
 # --- Agent commands ---
+
 
 @cli.group()
 def agent():
@@ -87,6 +90,7 @@ def agent_gates(name, set_gate):
 
 # --- Run commands ---
 
+
 @cli.command()
 @click.argument("agent_name")
 @click.option("--issue", type=int, help="GitHub issue number")
@@ -111,6 +115,7 @@ def run(agent_name, issue, pr, transcript, param):
 
 
 # --- Job commands ---
+
 
 @cli.group()
 def job():
@@ -174,13 +179,18 @@ def job_review(job_id, approve, reject_reason, comment):
         return
     decision = "approved" if approve else "rejected"
     comments = comment or reject_reason or ""
-    result = api.post(f"/jobs/{job_id}/review", {
-        "decision": decision, "comments": comments,
-    })
+    result = api.post(
+        f"/jobs/{job_id}/review",
+        {
+            "decision": decision,
+            "comments": comments,
+        },
+    )
     click.echo(f"Job #{job_id}: {result.get('decision', decision)} at stage '{result.get('stage', '?')}'")
 
 
 # --- Sync commands ---
+
 
 @cli.group()
 def sync():
@@ -213,6 +223,7 @@ def sync_status():
 
 
 # --- Report commands ---
+
 
 @cli.group()
 def report():
@@ -255,6 +266,7 @@ def report_view(report_type, report_id, show_json):
 
 # --- Events commands ---
 
+
 @cli.group()
 def events():
     """Browse events."""
@@ -277,6 +289,7 @@ def events_list(limit, event_type):
 
 
 # --- Knowledge commands ---
+
 
 @cli.group()
 def knowledge():
@@ -319,6 +332,7 @@ def knowledge_stats():
 
 # --- Schedule commands ---
 
+
 @cli.group()
 def schedule():
     """Manage scheduled jobs."""
@@ -339,7 +353,9 @@ def schedule_list():
         next_run = s.get("next_run_at", "-")
         if next_run and next_run != "-":
             next_run = next_run[:19]
-        click.echo(f"{s['id']:<5} {s['name']:<25} {s['schedule_type']:<15} {s['cron_expression']:<20} {'Yes' if s['enabled'] else 'No':<8} {next_run}")
+        click.echo(
+            f"{s['id']:<5} {s['name']:<25} {s['schedule_type']:<15} {s['cron_expression']:<20} {'Yes' if s['enabled'] else 'No':<8} {next_run}"
+        )
 
 
 @schedule.command("create")
@@ -373,9 +389,8 @@ def schedule_delete(schedule_id):
     api.post(f"/schedules/{schedule_id}", None)  # Will use DELETE via direct call
     # Actually need to use a different approach since api_client only has get/post/put
     import urllib.request
-    req = urllib.request.Request(
-        f"{api.API_URL}/schedules/{schedule_id}", method="DELETE"
-    )
+
+    req = urllib.request.Request(f"{api.API_URL}/schedules/{schedule_id}", method="DELETE")
     try:
         urllib.request.urlopen(req)
         click.echo(f"Schedule #{schedule_id} deleted.")

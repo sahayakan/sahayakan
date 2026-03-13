@@ -1,7 +1,5 @@
 """WebSocket endpoint for real-time log streaming."""
 
-import json
-
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 
 from app.log_store import get_logs, subscribe, unsubscribe

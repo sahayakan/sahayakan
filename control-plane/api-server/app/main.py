@@ -5,7 +5,22 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import PlainTextResponse
 
 from app.database import close_db, init_db
-from app.routes import agents, auth, events, ingestion, insights, jobs, knowledge, logs, reviews, schedules, search, usage, webhooks, websocket
+from app.routes import (
+    agents,
+    auth,
+    events,
+    ingestion,
+    insights,
+    jobs,
+    knowledge,
+    logs,
+    reviews,
+    schedules,
+    search,
+    usage,
+    webhooks,
+    websocket,
+)
 
 
 @asynccontextmanager

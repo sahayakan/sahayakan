@@ -1,5 +1,3 @@
-import json
-
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
@@ -62,8 +60,7 @@ async def submit_review(job_id: int, review: ReviewDecision):
     stage = None
     for gate in gates:
         existing = await pool.fetchrow(
-            "SELECT id FROM review_decisions "
-            "WHERE run_id = $1 AND stage = $2",
+            "SELECT id FROM review_decisions WHERE run_id = $1 AND stage = $2",
             run["id"],
             gate["stage"],
         )
@@ -78,8 +75,7 @@ async def submit_review(job_id: int, review: ReviewDecision):
         )
 
     await pool.execute(
-        "INSERT INTO review_decisions (run_id, stage, decision, reviewer, comments) "
-        "VALUES ($1, $2, $3, $4, $5)",
+        "INSERT INTO review_decisions (run_id, stage, decision, reviewer, comments) VALUES ($1, $2, $3, $4, $5)",
         run["id"],
         stage,
         review.decision,
@@ -99,15 +95,12 @@ async def submit_review(job_id: int, review: ReviewDecision):
 async def get_review_status(job_id: int):
     pool = await get_pool()
 
-    job = await pool.fetchrow(
-        "SELECT id, status, agent_name FROM jobs WHERE id = $1", job_id
-    )
+    job = await pool.fetchrow("SELECT id, status, agent_name FROM jobs WHERE id = $1", job_id)
     if not job:
         raise HTTPException(status_code=404, detail=f"Job {job_id} not found")
 
     run = await pool.fetchrow(
-        "SELECT id, status FROM agent_runs "
-        "WHERE job_id = $1 ORDER BY start_time DESC LIMIT 1",
+        "SELECT id, status FROM agent_runs WHERE job_id = $1 ORDER BY start_time DESC LIMIT 1",
         job_id,
     )
 
@@ -140,8 +133,7 @@ async def list_gates(name: str):
         raise HTTPException(status_code=404, detail=f"Agent '{name}' not found")
 
     rows = await pool.fetch(
-        "SELECT agent_name, stage, enabled FROM review_gates "
-        "WHERE agent_name = $1 ORDER BY stage",
+        "SELECT agent_name, stage, enabled FROM review_gates WHERE agent_name = $1 ORDER BY stage",
         name,
     )
     return [dict(r) for r in rows]
@@ -173,8 +165,6 @@ async def configure_gates(name: str, gates: list[GateConfig]):
             gate.stage,
             gate.enabled,
         )
-        results.append(
-            {"agent_name": name, "stage": gate.stage, "enabled": gate.enabled}
-        )
+        results.append({"agent_name": name, "stage": gate.stage, "enabled": gate.enabled})
 
     return results

@@ -2,6 +2,7 @@
 
 import sys
 import tempfile
+
 sys.path.insert(0, "data-plane")
 
 from agent_runner.contracts.base_agent import AgentInput, AgentOutput, BaseAgent
@@ -9,8 +10,8 @@ from agent_runner.knowledge import KnowledgeCache
 from agent_runner.logging_utils import AgentLogger
 from agents.dummy.agent import DummyAgent
 from agents.issue_triage.agent import IssueTriageAgent
-from agents.pr_context.agent import PRContextAgent
 from agents.meeting_summary.agent import MeetingSummaryAgent
+from agents.pr_context.agent import PRContextAgent
 
 
 def test_all_agents_are_base_agent():

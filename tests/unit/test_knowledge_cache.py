@@ -1,8 +1,8 @@
 """Unit tests for the knowledge cache library."""
 
-import json
-import tempfile
 import sys
+import tempfile
+
 sys.path.insert(0, "data-plane")
 
 from agent_runner.knowledge import KnowledgeCache

@@ -5,7 +5,6 @@ to be available on the Python path. When running in Docker, mount
 the project root or run the API server directly.
 """
 
-import json
 import os
 import sys
 from pathlib import Path
@@ -45,6 +44,7 @@ def _setup_paths():
 def _get_knowledge_cache():
     _setup_paths()
     from agent_runner.knowledge import KnowledgeCache
+
     return KnowledgeCache(settings.knowledge_cache_path)
 
 
@@ -60,11 +60,11 @@ async def github_sync(request: GitHubSyncRequest):
     try:
         _setup_paths()
         from ingestion.github_fetcher.fetcher import GitHubFetcher
-    except ImportError:
+    except ImportError as e:
         raise HTTPException(
             status_code=501,
             detail="Ingestion modules not available in this deployment",
-        )
+        ) from e
 
     cache = _get_knowledge_cache()
     fetcher = GitHubFetcher(token=token, knowledge_cache=cache)
@@ -109,11 +109,11 @@ async def jira_sync(request: JiraSyncRequest):
     try:
         _setup_paths()
         from ingestion.jira_fetcher.fetcher import JiraFetcher
-    except ImportError:
+    except ImportError as e:
         raise HTTPException(
             status_code=501,
             detail="Ingestion modules not available in this deployment",
-        )
+        ) from e
 
     cache = _get_knowledge_cache()
     fetcher = JiraFetcher(
@@ -150,8 +150,8 @@ async def slack_sync(request: SlackSyncRequest):
     try:
         _setup_paths()
         from ingestion.slack_fetcher.fetcher import SlackFetcher
-    except ImportError:
-        raise HTTPException(status_code=501, detail="Slack ingestion modules not available")
+    except ImportError as e:
+        raise HTTPException(status_code=501, detail="Slack ingestion modules not available") from e
 
     cache = _get_knowledge_cache()
     fetcher = SlackFetcher(token=token, knowledge_cache=cache)
@@ -164,11 +164,12 @@ async def slack_sync(request: SlackSyncRequest):
     # Publish slack.synced event
     try:
         from app.database import get_pool
+
         pool = await get_pool()
         import json as _json
+
         await pool.execute(
-            "INSERT INTO events (event_type, source, payload) "
-            "VALUES ('slack.synced', 'slack-ingestion', $1::jsonb)",
+            "INSERT INTO events (event_type, source, payload) VALUES ('slack.synced', 'slack-ingestion', $1::jsonb)",
             _json.dumps({"channel": request.channel_name, "messages": result.messages_synced}),
         )
     except Exception:

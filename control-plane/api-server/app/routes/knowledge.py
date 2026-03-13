@@ -2,8 +2,9 @@
 
 import json
 from pathlib import Path
+from typing import Annotated
 
-from fastapi import APIRouter, HTTPException, UploadFile, File, Form
+from fastapi import APIRouter, File, Form, HTTPException, UploadFile
 
 from app.config import settings
 from app.database import get_pool
@@ -24,13 +25,15 @@ async def list_issues():
     for f in sorted(issues_dir.glob("*.json")):
         try:
             data = json.loads(f.read_text())
-            results.append({
-                "number": data.get("number", f.stem),
-                "title": data.get("title", ""),
-                "state": data.get("state", ""),
-                "labels": data.get("labels", []),
-                "created_at": data.get("created_at", ""),
-            })
+            results.append(
+                {
+                    "number": data.get("number", f.stem),
+                    "title": data.get("title", ""),
+                    "state": data.get("state", ""),
+                    "labels": data.get("labels", []),
+                    "created_at": data.get("created_at", ""),
+                }
+            )
         except Exception:
             results.append({"number": f.stem, "title": "Error reading file"})
     return {"issues": results}
@@ -40,9 +43,7 @@ async def list_issues():
 async def get_issue(number: int):
     issue_file = _cache_path() / "github" / "issues" / f"{number}.json"
     if not issue_file.exists():
-        raise HTTPException(
-            status_code=404, detail=f"Issue #{number} not found in cache"
-        )
+        raise HTTPException(status_code=404, detail=f"Issue #{number} not found in cache")
     return json.loads(issue_file.read_text())
 
 
@@ -55,13 +56,15 @@ async def list_pull_requests():
     for f in sorted(prs_dir.glob("*.json")):
         try:
             data = json.loads(f.read_text())
-            results.append({
-                "number": data.get("number", f.stem),
-                "title": data.get("title", ""),
-                "state": data.get("state", ""),
-                "merged": data.get("merged", False),
-                "created_at": data.get("created_at", ""),
-            })
+            results.append(
+                {
+                    "number": data.get("number", f.stem),
+                    "title": data.get("title", ""),
+                    "state": data.get("state", ""),
+                    "merged": data.get("merged", False),
+                    "created_at": data.get("created_at", ""),
+                }
+            )
         except Exception:
             results.append({"number": f.stem, "title": "Error reading file"})
     return {"pull_requests": results}
@@ -76,12 +79,14 @@ async def list_jira_tickets():
     for f in sorted(tickets_dir.glob("*.json")):
         try:
             data = json.loads(f.read_text())
-            results.append({
-                "key": data.get("key", f.stem),
-                "summary": data.get("summary", ""),
-                "status": data.get("status", ""),
-                "priority": data.get("priority", ""),
-            })
+            results.append(
+                {
+                    "key": data.get("key", f.stem),
+                    "summary": data.get("summary", ""),
+                    "status": data.get("status", ""),
+                    "priority": data.get("priority", ""),
+                }
+            )
         except Exception:
             results.append({"key": f.stem, "summary": "Error reading file"})
     return {"tickets": results}
@@ -99,23 +104,21 @@ async def list_reports(report_type: str | None = None):
         if report_type and type_dir.name != report_type:
             continue
         for f in sorted(type_dir.glob("*.md")):
-            reports.append({
-                "type": type_dir.name,
-                "id": f.stem,
-                "path": f"{type_dir.name}/{f.stem}",
-            })
+            reports.append(
+                {
+                    "type": type_dir.name,
+                    "id": f.stem,
+                    "path": f"{type_dir.name}/{f.stem}",
+                }
+            )
     return {"reports": reports}
 
 
 @router.get("/reports/{report_type}/{report_id}")
 async def get_report(report_type: str, report_id: str):
     # Try markdown first, then JSON
-    md_file = (
-        _cache_path() / "agent_outputs" / report_type / f"{report_id}.md"
-    )
-    json_file = (
-        _cache_path() / "agent_outputs" / report_type / f"{report_id}.json"
-    )
+    md_file = _cache_path() / "agent_outputs" / report_type / f"{report_id}.md"
+    json_file = _cache_path() / "agent_outputs" / report_type / f"{report_id}.json"
 
     result = {}
     if md_file.exists():
@@ -148,8 +151,8 @@ async def list_transcripts():
 
 @router.post("/meetings/transcripts", status_code=201)
 async def upload_transcript(
-    transcript_id: str = Form(...),
-    file: UploadFile = File(...),
+    transcript_id: Annotated[str, Form(...)],
+    file: Annotated[UploadFile, File(...)],
 ):
     transcripts_dir = _cache_path() / "meetings" / "transcripts"
     transcripts_dir.mkdir(parents=True, exist_ok=True)
@@ -165,8 +168,7 @@ async def upload_transcript(
     try:
         pool = await get_pool()
         await pool.execute(
-            "INSERT INTO events (event_type, source, payload) "
-            "VALUES ('meeting.uploaded', 'api', $1::jsonb)",
+            "INSERT INTO events (event_type, source, payload) VALUES ('meeting.uploaded', 'api', $1::jsonb)",
             json.dumps({"transcript_id": transcript_id}),
         )
     except Exception:

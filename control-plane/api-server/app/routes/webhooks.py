@@ -5,7 +5,7 @@ import hmac
 import json
 import os
 
-from fastapi import APIRouter, Request, HTTPException
+from fastapi import APIRouter, HTTPException, Request
 
 from app.database import get_pool
 
@@ -16,9 +16,7 @@ def _verify_github_signature(payload: bytes, signature: str, secret: str) -> boo
     """Verify GitHub webhook signature (HMAC-SHA256)."""
     if not signature.startswith("sha256="):
         return False
-    expected = hmac.new(
-        secret.encode(), payload, hashlib.sha256
-    ).hexdigest()
+    expected = hmac.new(secret.encode(), payload, hashlib.sha256).hexdigest()
     return hmac.compare_digest(f"sha256={expected}", signature)
 
 
@@ -53,48 +51,53 @@ async def github_webhook(request: Request):
         issue = payload.get("issue", {})
         event = "issue.ingested" if action == "opened" else "issue.updated"
         await pool.execute(
-            "INSERT INTO events (event_type, source, payload) "
-            "VALUES ($1, 'github-webhook', $2::jsonb)",
+            "INSERT INTO events (event_type, source, payload) VALUES ($1, 'github-webhook', $2::jsonb)",
             event,
-            json.dumps({
-                "issue_id": issue.get("number"),
-                "issue_number": issue.get("number"),
-                "title": issue.get("title", ""),
-                "action": action,
-                "repo": payload.get("repository", {}).get("full_name", ""),
-            }),
+            json.dumps(
+                {
+                    "issue_id": issue.get("number"),
+                    "issue_number": issue.get("number"),
+                    "title": issue.get("title", ""),
+                    "action": action,
+                    "repo": payload.get("repository", {}).get("full_name", ""),
+                }
+            ),
         )
         events_published.append(event)
 
     elif event_type == "pull_request" and action in (
-        "opened", "synchronize", "edited",
+        "opened",
+        "synchronize",
+        "edited",
     ):
         pr = payload.get("pull_request", {})
         event = "pr.ingested" if action == "opened" else "pr.updated"
         await pool.execute(
-            "INSERT INTO events (event_type, source, payload) "
-            "VALUES ($1, 'github-webhook', $2::jsonb)",
+            "INSERT INTO events (event_type, source, payload) VALUES ($1, 'github-webhook', $2::jsonb)",
             event,
-            json.dumps({
-                "pr_number": pr.get("number"),
-                "title": pr.get("title", ""),
-                "action": action,
-                "repo": payload.get("repository", {}).get("full_name", ""),
-            }),
+            json.dumps(
+                {
+                    "pr_number": pr.get("number"),
+                    "title": pr.get("title", ""),
+                    "action": action,
+                    "repo": payload.get("repository", {}).get("full_name", ""),
+                }
+            ),
         )
         events_published.append(event)
 
     elif event_type == "issue_comment" and action == "created":
         issue = payload.get("issue", {})
         await pool.execute(
-            "INSERT INTO events (event_type, source, payload) "
-            "VALUES ('issue.commented', 'github-webhook', $1::jsonb)",
-            json.dumps({
-                "issue_id": issue.get("number"),
-                "issue_number": issue.get("number"),
-                "comment_user": payload.get("comment", {}).get("user", {}).get("login", ""),
-                "repo": payload.get("repository", {}).get("full_name", ""),
-            }),
+            "INSERT INTO events (event_type, source, payload) VALUES ('issue.commented', 'github-webhook', $1::jsonb)",
+            json.dumps(
+                {
+                    "issue_id": issue.get("number"),
+                    "issue_number": issue.get("number"),
+                    "comment_user": payload.get("comment", {}).get("user", {}).get("login", ""),
+                    "repo": payload.get("repository", {}).get("full_name", ""),
+                }
+            ),
         )
         events_published.append("issue.commented")
 

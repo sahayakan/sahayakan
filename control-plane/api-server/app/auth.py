@@ -8,10 +8,11 @@ import hashlib
 import os
 import secrets
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import UTC, datetime
+from typing import Annotated
 
-from fastapi import Request, HTTPException, Depends
-from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+from fastapi import Depends, HTTPException, Request
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
 from app.database import get_pool
 
@@ -27,6 +28,7 @@ AUTH_ENABLED = os.environ.get("AUTH_ENABLED", "false").lower() == "true"
 @dataclass
 class AuthContext:
     """Authenticated request context."""
+
     api_key_id: int | None = None
     team_id: int | None = None
     scopes: list[str] | None = None
@@ -56,7 +58,7 @@ def generate_api_key() -> tuple[str, str]:
 
 async def get_auth_context(
     request: Request,
-    credentials: HTTPAuthorizationCredentials | None = Depends(security),
+    credentials: Annotated[HTTPAuthorizationCredentials | None, Depends(security)] = None,
 ) -> AuthContext:
     """Extract and validate authentication from request."""
     # Skip auth for public routes
@@ -75,8 +77,7 @@ async def get_auth_context(
 
     pool = await get_pool()
     row = await pool.fetchrow(
-        "SELECT id, team_id, scopes, name, enabled, expires_at "
-        "FROM api_keys WHERE key_hash = $1",
+        "SELECT id, team_id, scopes, name, enabled, expires_at FROM api_keys WHERE key_hash = $1",
         key_hash,
     )
 
@@ -86,7 +87,7 @@ async def get_auth_context(
     if not row["enabled"]:
         raise HTTPException(status_code=403, detail="API key is disabled")
 
-    if row["expires_at"] and row["expires_at"] < datetime.now(timezone.utc).replace(tzinfo=None):
+    if row["expires_at"] and row["expires_at"] < datetime.now(UTC).replace(tzinfo=None):
         raise HTTPException(status_code=403, detail="API key has expired")
 
     # Update last_used_at
@@ -105,13 +106,15 @@ async def get_auth_context(
 
 def require_scope(scope: str):
     """Dependency that checks for a required scope."""
-    async def _check(auth: AuthContext = Depends(get_auth_context)):
+
+    async def _check(auth: Annotated[AuthContext, Depends(get_auth_context)] = None):
         if not auth.has_scope(scope):
             raise HTTPException(
                 status_code=403,
                 detail=f"Insufficient permissions. Required scope: {scope}",
             )
         return auth
+
     return _check
 
 
@@ -127,6 +130,7 @@ async def log_audit(
     """Record an action in the audit log."""
     try:
         import json
+
         await pool.execute(
             "INSERT INTO audit_log "
             "(api_key_id, team_id, action, resource, resource_id, details, ip_address) "

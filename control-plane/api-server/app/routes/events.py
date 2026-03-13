@@ -1,10 +1,10 @@
 """Event management API endpoints."""
 
 import json
+from typing import Any
 
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
-from typing import Any
 
 from app.database import get_pool
 
@@ -56,8 +56,7 @@ async def list_events(
 async def list_event_types():
     pool = await get_pool()
     rows = await pool.fetch(
-        "SELECT DISTINCT event_type, COUNT(*) as count "
-        "FROM events GROUP BY event_type ORDER BY event_type"
+        "SELECT DISTINCT event_type, COUNT(*) as count FROM events GROUP BY event_type ORDER BY event_type"
     )
     return {"types": [{"event_type": r["event_type"], "count": r["count"]} for r in rows]}
 
@@ -66,8 +65,7 @@ async def list_event_types():
 async def get_event(event_id: int):
     pool = await get_pool()
     row = await pool.fetchrow(
-        "SELECT id, event_type, source, payload, created_at, processed "
-        "FROM events WHERE id = $1",
+        "SELECT id, event_type, source, payload, created_at, processed FROM events WHERE id = $1",
         event_id,
     )
     if not row:
@@ -79,8 +77,7 @@ async def get_event(event_id: int):
 async def publish_event(event: EventPublish):
     pool = await get_pool()
     row = await pool.fetchrow(
-        "INSERT INTO events (event_type, source, payload) "
-        "VALUES ($1, $2, $3::jsonb) RETURNING id, created_at",
+        "INSERT INTO events (event_type, source, payload) VALUES ($1, $2, $3::jsonb) RETURNING id, created_at",
         event.event_type,
         event.source,
         json.dumps(event.payload),
@@ -89,6 +86,7 @@ async def publish_event(event: EventPublish):
 
 
 # --- Subscription endpoints ---
+
 
 @router.get("/subscriptions/{agent_name}")
 async def list_subscriptions(agent_name: str):
@@ -117,7 +115,7 @@ async def add_subscription(agent_name: str, sub: SubscriptionCreate):
         )
     except Exception as e:
         if "unique" in str(e).lower():
-            raise HTTPException(status_code=409, detail="Subscription already exists")
+            raise HTTPException(status_code=409, detail="Subscription already exists") from e
         raise
     return {"agent_name": agent_name, "event_type": sub.event_type}
 

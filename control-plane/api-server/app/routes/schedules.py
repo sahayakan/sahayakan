@@ -1,11 +1,10 @@
 """Schedule management API endpoints."""
 
 import json
-from datetime import datetime, timezone
+from typing import Any
 
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
-from typing import Any
 
 from app.database import get_pool
 
@@ -42,9 +41,7 @@ async def list_schedules():
 @router.get("/{schedule_id}")
 async def get_schedule(schedule_id: int):
     pool = await get_pool()
-    row = await pool.fetchrow(
-        "SELECT * FROM schedules WHERE id = $1", schedule_id
-    )
+    row = await pool.fetchrow("SELECT * FROM schedules WHERE id = $1", schedule_id)
     if not row:
         raise HTTPException(status_code=404, detail=f"Schedule {schedule_id} not found")
     return dict(row)
@@ -58,9 +55,7 @@ async def create_schedule(schedule: ScheduleCreate):
     if schedule.schedule_type == "agent_job":
         if not schedule.agent_name:
             raise HTTPException(status_code=400, detail="agent_name required for agent_job schedules")
-        agent = await pool.fetchrow(
-            "SELECT name FROM agents WHERE name = $1", schedule.agent_name
-        )
+        agent = await pool.fetchrow("SELECT name FROM agents WHERE name = $1", schedule.agent_name)
         if not agent:
             raise HTTPException(status_code=404, detail=f"Agent '{schedule.agent_name}' not found")
 

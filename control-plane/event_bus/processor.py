@@ -2,7 +2,6 @@
 
 import asyncio
 import json
-from datetime import datetime, timezone
 
 import asyncpg
 
@@ -40,13 +39,10 @@ class EventBusProcessor:
         ]
         for agent_name, event_type in defaults:
             # Only register if agent exists
-            agent = await self.pool.fetchrow(
-                "SELECT name FROM agents WHERE name = $1", agent_name
-            )
+            agent = await self.pool.fetchrow("SELECT name FROM agents WHERE name = $1", agent_name)
             if agent:
                 await self.pool.execute(
-                    "INSERT INTO agent_subscriptions (agent_name, event_type) "
-                    "VALUES ($1, $2) ON CONFLICT DO NOTHING",
+                    "INSERT INTO agent_subscriptions (agent_name, event_type) VALUES ($1, $2) ON CONFLICT DO NOTHING",
                     agent_name,
                     event_type,
                 )
@@ -69,17 +65,14 @@ class EventBusProcessor:
 
             # Find subscribed agents
             subs = await self.pool.fetch(
-                "SELECT agent_name FROM agent_subscriptions "
-                "WHERE event_type = $1",
+                "SELECT agent_name FROM agent_subscriptions WHERE event_type = $1",
                 event_type,
             )
 
             for sub in subs:
                 agent_name = sub["agent_name"]
                 # Build job parameters from event payload
-                job_params = self._build_job_params(
-                    agent_name, event_type, payload
-                )
+                job_params = self._build_job_params(agent_name, event_type, payload)
                 if job_params is None:
                     continue
 
@@ -96,14 +89,12 @@ class EventBusProcessor:
 
                 # Create job
                 await self.pool.execute(
-                    "INSERT INTO jobs (agent_name, status, parameters) "
-                    "VALUES ($1, 'pending', $2::jsonb)",
+                    "INSERT INTO jobs (agent_name, status, parameters) VALUES ($1, 'pending', $2::jsonb)",
                     agent_name,
                     json.dumps(job_params),
                 )
                 print(
-                    f"[EventBus] Event '{event_type}' -> "
-                    f"created job for '{agent_name}'",
+                    f"[EventBus] Event '{event_type}' -> created job for '{agent_name}'",
                     flush=True,
                 )
 
@@ -113,9 +104,7 @@ class EventBusProcessor:
                 event_id,
             )
 
-    def _build_job_params(
-        self, agent_name: str, event_type: str, payload: dict
-    ) -> dict | None:
+    def _build_job_params(self, agent_name: str, event_type: str, payload: dict) -> dict | None:
         """Build appropriate job parameters based on agent and event."""
         if agent_name == "issue-triage" and event_type == "issue.ingested":
             issue_id = payload.get("issue_id") or payload.get("issue_number")

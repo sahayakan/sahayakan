@@ -35,9 +35,7 @@ class VertexAIEmbeddingProvider(EmbeddingProvider):
             from vertexai.language_models import TextEmbeddingModel
 
             vertexai.init(project=self.project, location=self.location)
-            self._model = TextEmbeddingModel.from_pretrained(
-                "text-embedding-004"
-            )
+            self._model = TextEmbeddingModel.from_pretrained("text-embedding-004")
         return self._model
 
     def embed(self, text: str) -> list[float]:
@@ -97,8 +95,7 @@ class EmbeddingService:
 
         # Check if already embedded with same content
         existing = await self.pool.fetchrow(
-            "SELECT content_hash FROM embeddings "
-            "WHERE source_type = $1 AND source_id = $2",
+            "SELECT content_hash FROM embeddings WHERE source_type = $1 AND source_id = $2",
             source_type,
             source_id,
         )
@@ -135,7 +132,7 @@ class EmbeddingService:
         vector_str = "[" + ",".join(str(v) for v in query_vector) + "]"
 
         if source_types:
-            placeholders = ", ".join(f"${i+2}" for i in range(len(source_types)))
+            placeholders = ", ".join(f"${i + 2}" for i in range(len(source_types)))
             rows = await self.pool.fetch(
                 f"SELECT source_type, source_id, metadata, "
                 f"1 - (embedding <=> $1::vector) as similarity "
@@ -188,11 +185,7 @@ class EmbeddingService:
 
     async def embed_pr(self, pr_data: dict) -> bool:
         """Embed a GitHub pull request."""
-        text = (
-            f"{pr_data.get('title', '')} "
-            f"{pr_data.get('body', '')} "
-            f"Labels: {', '.join(pr_data.get('labels', []))}"
-        )
+        text = f"{pr_data.get('title', '')} {pr_data.get('body', '')} Labels: {', '.join(pr_data.get('labels', []))}"
         return await self.embed_and_store(
             "pr",
             str(pr_data["number"]),
@@ -223,9 +216,7 @@ class EmbeddingService:
             },
         )
 
-    async def embed_report(
-        self, report_type: str, report_id: str, report_data: dict
-    ) -> bool:
+    async def embed_report(self, report_type: str, report_id: str, report_data: dict) -> bool:
         """Embed an agent report."""
         text = json.dumps(report_data, indent=2)[:6000]
         return await self.embed_and_store(
@@ -240,10 +231,7 @@ class EmbeddingService:
 
     async def get_embedding_count(self) -> dict:
         """Get count of embeddings by source type."""
-        rows = await self.pool.fetch(
-            "SELECT source_type, COUNT(*) as count "
-            "FROM embeddings GROUP BY source_type"
-        )
+        rows = await self.pool.fetch("SELECT source_type, COUNT(*) as count FROM embeddings GROUP BY source_type")
         return {r["source_type"]: r["count"] for r in rows}
 
     async def backfill_from_cache(self, knowledge_cache) -> dict:
@@ -279,9 +267,7 @@ class EmbeddingService:
 
         # Embed reports
         for report_type in ("issue_analysis", "pr_context", "meeting_summaries"):
-            for f in knowledge_cache.list_files(
-                f"agent_outputs/{report_type}", "*.json"
-            ):
+            for f in knowledge_cache.list_files(f"agent_outputs/{report_type}", "*.json"):
                 try:
                     data = knowledge_cache.read_json(f)
                     rid = f.split("/")[-1].replace(".json", "")

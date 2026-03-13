@@ -57,11 +57,16 @@ async def usage_by_agent():
     results = []
     for r in rows:
         cost = _estimate_cost("gemini-1.5-pro", r["tokens_input"], r["tokens_output"])
-        results.append({
-            "agent": r["agent_name"], "runs": r["runs"],
-            "tokens_input": r["tokens_input"], "tokens_output": r["tokens_output"],
-            "avg_latency_ms": round(r["avg_latency_ms"]), "estimated_cost": round(cost, 6),
-        })
+        results.append(
+            {
+                "agent": r["agent_name"],
+                "runs": r["runs"],
+                "tokens_input": r["tokens_input"],
+                "tokens_output": r["tokens_output"],
+                "avg_latency_ms": round(r["avg_latency_ms"]),
+                "estimated_cost": round(cost, 6),
+            }
+        )
     return {"agents": results}
 
 
@@ -77,11 +82,15 @@ async def usage_by_model():
     results = []
     for r in rows:
         cost = _estimate_cost(r["model"], r["tokens_input"], r["tokens_output"])
-        results.append({
-            "model": r["model"], "calls": r["calls"],
-            "tokens_input": r["tokens_input"], "tokens_output": r["tokens_output"],
-            "estimated_cost": round(cost, 6),
-        })
+        results.append(
+            {
+                "model": r["model"],
+                "calls": r["calls"],
+                "tokens_input": r["tokens_input"],
+                "tokens_output": r["tokens_output"],
+                "estimated_cost": round(cost, 6),
+            }
+        )
     return {"models": results}
 
 
@@ -94,5 +103,14 @@ async def usage_daily():
         "COALESCE(SUM(tokens_output), 0) as tokens_output "
         "FROM llm_usage GROUP BY DATE(created_at) ORDER BY day DESC LIMIT 30"
     )
-    return {"daily": [{"day": str(r["day"]), "calls": r["calls"],
-                        "tokens_input": r["tokens_input"], "tokens_output": r["tokens_output"]} for r in rows]}
+    return {
+        "daily": [
+            {
+                "day": str(r["day"]),
+                "calls": r["calls"],
+                "tokens_input": r["tokens_input"],
+                "tokens_output": r["tokens_output"],
+            }
+            for r in rows
+        ]
+    }

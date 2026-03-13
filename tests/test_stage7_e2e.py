@@ -8,26 +8,31 @@ sys.path.insert(0, "data-plane")
 
 import asyncpg
 
-from agent_runner.knowledge import KnowledgeCache
 from agent_runner.embedding_service import (
     EmbeddingService,
     MockEmbeddingProvider,
 )
+from agent_runner.knowledge import KnowledgeCache
 
 
 def _meta(r):
     m = r.get("metadata")
     if isinstance(m, str):
         import json as _json
+
         return _json.loads(m)
     return m or {}
 
 
 async def main():
     pool = await asyncpg.create_pool(
-        user="sahayakan", password="sahayakan_dev_password",
-        database="sahayakan", host="localhost", port=5433,
-        min_size=1, max_size=3,
+        user="sahayakan",
+        password="sahayakan_dev_password",
+        database="sahayakan",
+        host="localhost",
+        port=5433,
+        min_size=1,
+        max_size=3,
     )
     cache = KnowledgeCache("knowledge-cache")
     provider = MockEmbeddingProvider()
@@ -67,7 +72,8 @@ async def main():
     print("TEST 3: Embed new content and search")
     print("=" * 60)
     await service.embed_and_store(
-        "issue", "9999",
+        "issue",
+        "9999",
         "Login page crashes when OAuth token expires during session refresh",
         metadata={"title": "Login crash on token expiry", "state": "open"},
     )
@@ -83,7 +89,8 @@ async def main():
     print("TEST 4: Idempotent embedding")
     print("=" * 60)
     updated = await service.embed_and_store(
-        "issue", "9999",
+        "issue",
+        "9999",
         "Login page crashes when OAuth token expires during session refresh",
         metadata={"title": "Login crash on token expiry"},
     )
@@ -96,6 +103,7 @@ async def main():
     print("TEST 5: API endpoints")
     print("=" * 60)
     import urllib.request
+
     # Stats
     resp = urllib.request.urlopen("http://localhost:8000/knowledge/search/stats")
     stats = json.loads(resp.read())

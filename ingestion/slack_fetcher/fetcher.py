@@ -4,17 +4,16 @@ Fetches messages from Slack channels and stores them in the knowledge cache.
 Uses the Slack Web API (conversations.history, conversations.replies).
 """
 
+import contextlib
 import json
 import os
-import urllib.request
-import urllib.error
-from datetime import datetime, timezone
-from dataclasses import dataclass, field
-
 import sys
-sys.path.insert(
-    0, os.path.join(os.path.dirname(__file__), "..", "..", "data-plane")
-)
+import urllib.error
+import urllib.request
+from dataclasses import dataclass, field
+from datetime import UTC, datetime
+
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "..", "data-plane"))
 from agent_runner.knowledge import KnowledgeCache
 
 
@@ -47,13 +46,11 @@ class SlackFetcher:
             raise RuntimeError(f"Slack API error: {data.get('error', 'unknown')}")
         return data
 
-    def sync_channel(
-        self, channel_id: str, channel_name: str, since_ts: str | None = None
-    ) -> SyncResult:
+    def sync_channel(self, channel_id: str, channel_name: str, since_ts: str | None = None) -> SyncResult:
         """Sync messages from a Slack channel."""
         result = SyncResult(
             channel=channel_name,
-            timestamp=datetime.now(timezone.utc).isoformat(),
+            timestamp=datetime.now(UTC).isoformat(),
         )
 
         try:
@@ -72,14 +69,12 @@ class SlackFetcher:
                 }
 
                 # Store by date
-                date_str = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+                date_str = datetime.now(UTC).strftime("%Y-%m-%d")
                 path = f"slack/channels/{channel_name}/{date_str}.json"
                 self.cache.write_json(path, channel_data)
 
                 # Commit
-                files = self.cache.list_files(
-                    f"slack/channels/{channel_name}", "*.json"
-                )
+                files = self.cache.list_files(f"slack/channels/{channel_name}", "*.json")
                 if files:
                     self.cache.commit(
                         message=f"Slack sync: {len(messages)} messages from #{channel_name}",
@@ -93,9 +88,7 @@ class SlackFetcher:
 
         return result
 
-    def _fetch_messages(
-        self, channel_id: str, since_ts: str | None = None
-    ) -> list[dict]:
+    def _fetch_messages(self, channel_id: str, since_ts: str | None = None) -> list[dict]:
         """Fetch messages from a channel with pagination."""
         all_messages = []
         cursor = None
@@ -120,12 +113,8 @@ class SlackFetcher:
 
                 # Fetch thread replies if any
                 if msg.get("reply_count", 0) > 0:
-                    try:
-                        processed["thread_replies"] = self._fetch_thread(
-                            channel_id, msg["ts"]
-                        )
-                    except Exception:
-                        pass
+                    with contextlib.suppress(Exception):
+                        processed["thread_replies"] = self._fetch_thread(channel_id, msg["ts"])
 
                 all_messages.append(processed)
 
@@ -138,26 +127,34 @@ class SlackFetcher:
 
     def _fetch_thread(self, channel_id: str, thread_ts: str) -> list[dict]:
         """Fetch thread replies."""
-        data = self._request("conversations.replies", {
-            "channel": channel_id,
-            "ts": thread_ts,
-            "limit": "100",
-        })
+        data = self._request(
+            "conversations.replies",
+            {
+                "channel": channel_id,
+                "ts": thread_ts,
+                "limit": "100",
+            },
+        )
         replies = []
         for msg in data.get("messages", [])[1:]:  # Skip parent message
-            replies.append({
-                "user": msg.get("user", "unknown"),
-                "text": msg.get("text", ""),
-                "ts": msg.get("ts", ""),
-            })
+            replies.append(
+                {
+                    "user": msg.get("user", "unknown"),
+                    "text": msg.get("text", ""),
+                    "ts": msg.get("ts", ""),
+                }
+            )
         return replies
 
     def list_channels(self) -> list[dict]:
         """List available Slack channels."""
-        data = self._request("conversations.list", {
-            "types": "public_channel,private_channel",
-            "limit": "200",
-        })
+        data = self._request(
+            "conversations.list",
+            {
+                "types": "public_channel,private_channel",
+                "limit": "200",
+            },
+        )
         return [
             {"id": c["id"], "name": c["name"], "topic": c.get("topic", {}).get("value", "")}
             for c in data.get("channels", [])

@@ -2,7 +2,7 @@
 
 import json
 import re
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 from agent_runner.contracts.base_agent import AgentInput, AgentOutput, BaseAgent
@@ -14,7 +14,13 @@ PROMPT_PATH = Path(__file__).parent.parent.parent / "prompts" / "meeting_summary
 
 
 class MeetingSummaryAgent(BaseAgent):
-    def __init__(self, knowledge_cache: KnowledgeCache, logger: AgentLogger, llm_client: LLMClient | None = None, embedding_service=None):
+    def __init__(
+        self,
+        knowledge_cache: KnowledgeCache,
+        logger: AgentLogger,
+        llm_client: LLMClient | None = None,
+        embedding_service=None,
+    ):
         self.cache = knowledge_cache
         self.log = logger
         self.llm = llm_client
@@ -46,7 +52,7 @@ class MeetingSummaryAgent(BaseAgent):
         text = self.transcript_text.lower()
 
         # Find mentioned issue numbers
-        issue_nums = set(int(m) for m in re.findall(r'#(\d+)', text))
+        issue_nums = set(int(m) for m in re.findall(r"#(\d+)", text))
         related_issues = []
         for num in issue_nums:
             path = f"github/issues/{num}.json"
@@ -56,7 +62,7 @@ class MeetingSummaryAgent(BaseAgent):
         self.log.info(f"Found {len(related_issues)} mentioned issues")
 
         # Find mentioned PR numbers (pr #N or pull #N patterns)
-        pr_nums = set(int(m) for m in re.findall(r'(?:pr|pull)\s*#?(\d+)', text))
+        pr_nums = set(int(m) for m in re.findall(r"(?:pr|pull)\s*#?(\d+)", text))
         related_prs = []
         for num in pr_nums:
             path = f"github/pull_requests/{num}.json"
@@ -66,7 +72,7 @@ class MeetingSummaryAgent(BaseAgent):
         self.log.info(f"Found {len(related_prs)} mentioned PRs")
 
         # Find mentioned Jira tickets
-        jira_keys = set(re.findall(r'[A-Z]{2,}-\d+', self.transcript_text))
+        jira_keys = set(re.findall(r"[A-Z]{2,}-\d+", self.transcript_text))
         related_jira = []
         for key in jira_keys:
             path = f"jira/tickets/{key}.json"
@@ -83,34 +89,64 @@ class MeetingSummaryAgent(BaseAgent):
         prompt_template = PROMPT_PATH.read_text()
         prompt = prompt_template.format(
             transcript=self.transcript_text[:15000],  # Limit transcript size
-            related_issues=json.dumps(self.context["related_issues"], indent=2) if self.context["related_issues"] else "None found",
-            related_prs=json.dumps(self.context["related_prs"], indent=2) if self.context["related_prs"] else "None found",
-            jira_tickets=json.dumps(self.context["related_jira"], indent=2) if self.context["related_jira"] else "None found",
+            related_issues=json.dumps(self.context["related_issues"], indent=2)
+            if self.context["related_issues"]
+            else "None found",
+            related_prs=json.dumps(self.context["related_prs"], indent=2)
+            if self.context["related_prs"]
+            else "None found",
+            jira_tickets=json.dumps(self.context["related_jira"], indent=2)
+            if self.context["related_jira"]
+            else "None found",
         )
         self.log.info(f"Sending prompt to LLM ({len(prompt)} chars)")
         response = self.llm.generate(prompt)
-        self.log.llm(model=response.model, tokens=response.tokens_input + response.tokens_output, latency_ms=response.latency_ms)
-        self.llm_usage = {"model": response.model, "tokens_input": response.tokens_input, "tokens_output": response.tokens_output, "latency_ms": response.latency_ms}
+        self.log.llm(
+            model=response.model, tokens=response.tokens_input + response.tokens_output, latency_ms=response.latency_ms
+        )
+        self.llm_usage = {
+            "model": response.model,
+            "tokens_input": response.tokens_input,
+            "tokens_output": response.tokens_output,
+            "latency_ms": response.latency_ms,
+        }
 
         try:
             text = response.text.strip()
             if text.startswith("```"):
-                text = re.sub(r'^```\w*\n?', '', text)
-                text = re.sub(r'\n?```$', '', text)
+                text = re.sub(r"^```\w*\n?", "", text)
+                text = re.sub(r"\n?```$", "", text)
             self.analysis = json.loads(text)
         except json.JSONDecodeError as e:
             self.log.error(f"Failed to parse LLM response: {e}")
-            self.analysis = {"title": self.transcript_id, "attendees": [], "summary": "Parse failure", "action_items": [], "decisions": [], "mentioned_issues": [], "mentioned_prs": [], "mentioned_jira_tickets": [], "key_topics": [], "confidence": 0.0}
+            self.analysis = {
+                "title": self.transcript_id,
+                "attendees": [],
+                "summary": "Parse failure",
+                "action_items": [],
+                "decisions": [],
+                "mentioned_issues": [],
+                "mentioned_prs": [],
+                "mentioned_jira_tickets": [],
+                "key_topics": [],
+                "confidence": 0.0,
+            }
 
-        self.log.info(f"Analysis complete: {len(self.analysis.get('action_items', []))} action items, {len(self.analysis.get('decisions', []))} decisions")
+        self.log.info(
+            f"Analysis complete: {len(self.analysis.get('action_items', []))} action items, {len(self.analysis.get('decisions', []))} decisions"
+        )
 
     def generate_output(self) -> AgentOutput:
         output_data = {
-            "meeting_id": self.transcript_id, **self.analysis, "llm_usage": self.llm_usage,
-            "generated_at": datetime.now(timezone.utc).isoformat(),
+            "meeting_id": self.transcript_id,
+            **self.analysis,
+            "llm_usage": self.llm_usage,
+            "generated_at": datetime.now(UTC).isoformat(),
         }
         return AgentOutput(
-            status="success", summary=self.analysis.get("summary", f"Meeting {self.transcript_id} summarized"), data=output_data,
+            status="success",
+            summary=self.analysis.get("summary", f"Meeting {self.transcript_id} summarized"),
+            data=output_data,
             artifacts=[
                 {"type": "meeting_summary_json", "path": f"agent_outputs/meeting_summaries/{self.transcript_id}.json"},
                 {"type": "meeting_summary_report", "path": f"agent_outputs/meeting_summaries/{self.transcript_id}.md"},
@@ -132,7 +168,9 @@ class MeetingSummaryAgent(BaseAgent):
     def _generate_report(self, data: dict) -> str:
         lines = [
             f"# Meeting Summary: {data.get('title', self.transcript_id)}",
-            "", f"**Generated by:** meeting-summary agent", f"**Date:** {data.get('generated_at', 'N/A')}",
+            "",
+            "**Generated by:** meeting-summary agent",
+            f"**Date:** {data.get('generated_at', 'N/A')}",
             f"**Confidence:** {data.get('confidence', 0)}",
         ]
         if data.get("attendees"):

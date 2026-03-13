@@ -21,11 +21,7 @@ MAIN_FILE = os.path.join(CONTROL_PLANE, "main.py")
 
 def _get_agent_dirs():
     """Return list of agent directory names (excluding __pycache__)."""
-    return [
-        d for d in os.listdir(AGENTS_DIR)
-        if os.path.isdir(os.path.join(AGENTS_DIR, d))
-        and not d.startswith("__")
-    ]
+    return [d for d in os.listdir(AGENTS_DIR) if os.path.isdir(os.path.join(AGENTS_DIR, d)) and not d.startswith("__")]
 
 
 def _get_registry_keys():
@@ -38,10 +34,7 @@ def _get_registry_keys():
 
 def _get_route_modules():
     """Return list of route module names (excluding __init__)."""
-    return [
-        f[:-3] for f in os.listdir(ROUTES_DIR)
-        if f.endswith(".py") and f != "__init__.py"
-    ]
+    return [f[:-3] for f in os.listdir(ROUTES_DIR) if f.endswith(".py") and f != "__init__.py"]
 
 
 def _get_registered_routes():
@@ -62,7 +55,8 @@ def test_all_agents_inherit_base_agent():
 
         tree = ast.parse(content)
         classes = [
-            node for node in ast.walk(tree)
+            node
+            for node in ast.walk(tree)
             if isinstance(node, ast.ClassDef)
             and any(
                 (isinstance(base, ast.Name) and base.id == "BaseAgent")
@@ -82,8 +76,7 @@ def test_all_agents_registered():
     for agent_dir in agent_dirs:
         expected_key = agent_dir.replace("_", "-")
         assert expected_key in registry_keys, (
-            f"Agent '{agent_dir}' not registered in get_agent_registry(). "
-            f"Expected key '{expected_key}'"
+            f"Agent '{agent_dir}' not registered in get_agent_registry(). Expected key '{expected_key}'"
         )
 
 
@@ -98,13 +91,8 @@ def test_all_agents_have_prompt_templates():
     for agent_dir in agent_dirs:
         # Check for any prompt file that could belong to this agent
         # Prompt names may differ slightly (e.g., issue_triage -> issue_analysis)
-        matching = [p for p in prompt_files if any(
-            part in p for part in agent_dir.split("_")
-        )]
-        assert matching, (
-            f"No prompt template found for agent '{agent_dir}'. "
-            f"Available prompts: {prompt_files}"
-        )
+        matching = [p for p in prompt_files if any(part in p for part in agent_dir.split("_"))]
+        assert matching, f"No prompt template found for agent '{agent_dir}'. Available prompts: {prompt_files}"
 
 
 def test_all_routes_registered():
@@ -114,8 +102,7 @@ def test_all_routes_registered():
 
     unregistered = route_modules - registered
     assert not unregistered, (
-        f"Route modules not registered in main.py: {unregistered}. "
-        f"Add app.include_router(<module>.router) to main.py"
+        f"Route modules not registered in main.py: {unregistered}. Add app.include_router(<module>.router) to main.py"
     )
 
 
@@ -131,15 +118,11 @@ def test_migration_numbering():
         numbers.append(int(match.group(1)))
 
     # Check for duplicates
-    assert len(numbers) == len(set(numbers)), (
-        f"Duplicate migration numbers found: {numbers}"
-    )
+    assert len(numbers) == len(set(numbers)), f"Duplicate migration numbers found: {numbers}"
 
     # Check sequential (starting from 1)
     expected = list(range(1, len(numbers) + 1))
-    assert numbers == expected, (
-        f"Migration numbers not sequential. Got {numbers}, expected {expected}"
-    )
+    assert numbers == expected, f"Migration numbers not sequential. Got {numbers}, expected {expected}"
 
 
 def test_registry_naming_convention():
@@ -148,14 +131,10 @@ def test_registry_naming_convention():
     agent_dirs = _get_agent_dirs()
 
     for key in registry_keys:
-        assert "_" not in key, (
-            f"Registry key '{key}' uses underscores; should use hyphens"
-        )
+        assert "_" not in key, f"Registry key '{key}' uses underscores; should use hyphens"
 
     for d in agent_dirs:
-        assert "-" not in d, (
-            f"Agent directory '{d}' uses hyphens; should use underscores"
-        )
+        assert "-" not in d, f"Agent directory '{d}' uses hyphens; should use underscores"
 
 
 def test_no_cross_boundary_imports():
@@ -181,9 +160,7 @@ def test_no_cross_boundary_imports():
             if line.strip().startswith("#"):
                 continue
             if re.match(r"^\s*(from|import)\s+.*data.plane", line):
-                raise AssertionError(
-                    f"Route {route_file} imports from data-plane (cross-boundary violation): {line}"
-                )
+                raise AssertionError(f"Route {route_file} imports from data-plane (cross-boundary violation): {line}")
 
 
 if __name__ == "__main__":

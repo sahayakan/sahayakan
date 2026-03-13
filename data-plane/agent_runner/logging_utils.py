@@ -1,7 +1,6 @@
 """Structured logging for agents and the runner."""
 
-import sys
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 
 class AgentLogger:
@@ -10,7 +9,7 @@ class AgentLogger:
         self._lines: list[str] = []
 
     def _format(self, level: str, message: str) -> str:
-        ts = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S.%fZ")
+        ts = datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%S.%fZ")
         job_part = f" [{self.job_id}]" if self.job_id is not None else ""
         return f"[{level}]  [{ts}]{job_part} {message}"
 

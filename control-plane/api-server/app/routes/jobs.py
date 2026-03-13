@@ -13,9 +13,7 @@ async def create_job(job: JobCreate):
     pool = await get_pool()
 
     # Verify agent exists
-    agent = await pool.fetchrow(
-        "SELECT name FROM agents WHERE name = $1", job.agent
-    )
+    agent = await pool.fetchrow("SELECT name FROM agents WHERE name = $1", job.agent)
     if not agent:
         raise HTTPException(
             status_code=404,
@@ -44,10 +42,7 @@ async def list_jobs(
 ):
     pool = await get_pool()
 
-    query = (
-        "SELECT id, agent_name, status, parameters, "
-        "created_at, started_at, completed_at FROM jobs"
-    )
+    query = "SELECT id, agent_name, status, parameters, created_at, started_at, completed_at FROM jobs"
     conditions = []
     args = []
     idx = 1
@@ -81,8 +76,7 @@ async def list_jobs(
 async def get_job(job_id: int):
     pool = await get_pool()
     row = await pool.fetchrow(
-        "SELECT id, agent_name, status, parameters, "
-        "created_at, started_at, completed_at FROM jobs WHERE id = $1",
+        "SELECT id, agent_name, status, parameters, created_at, started_at, completed_at FROM jobs WHERE id = $1",
         job_id,
     )
     if not row:

@@ -1,8 +1,5 @@
 """Insights API endpoints."""
 
-import json
-from datetime import datetime
-
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
@@ -96,8 +93,13 @@ async def get_trends():
 
     return {
         "job_trends": [{"day": str(r["day"]), "status": r["status"], "count": r["count"]} for r in job_trends],
-        "usage_trends": [{"day": str(r["day"]), "tokens_in": r["tokens_in"], "tokens_out": r["tokens_out"], "calls": r["calls"]} for r in usage_trends],
-        "event_trends": [{"day": str(r["day"]), "event_type": r["event_type"], "count": r["count"]} for r in event_trends],
+        "usage_trends": [
+            {"day": str(r["day"]), "tokens_in": r["tokens_in"], "tokens_out": r["tokens_out"], "calls": r["calls"]}
+            for r in usage_trends
+        ],
+        "event_trends": [
+            {"day": str(r["day"]), "event_type": r["event_type"], "count": r["count"]} for r in event_trends
+        ],
     }
 
 
@@ -117,7 +119,8 @@ async def update_insight_status(insight_id: int, update: InsightStatusUpdate):
     pool = await get_pool()
     row = await pool.fetchrow(
         "UPDATE insights SET status = $2, updated_at = NOW() WHERE id = $1 RETURNING *",
-        insight_id, update.status,
+        insight_id,
+        update.status,
     )
     if not row:
         raise HTTPException(status_code=404, detail=f"Insight {insight_id} not found")

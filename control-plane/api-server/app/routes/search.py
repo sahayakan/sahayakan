@@ -25,11 +25,11 @@ async def semantic_search(request: SearchRequest):
     # Check if embeddings table exists and has data
     try:
         count = await pool.fetchval("SELECT COUNT(*) FROM embeddings")
-    except Exception:
+    except Exception as e:
         raise HTTPException(
             status_code=501,
             detail="Embeddings table not available. Run migration 002_pgvector_embeddings.sql",
-        )
+        ) from e
 
     if count == 0:
         return {
@@ -70,11 +70,11 @@ async def semantic_search(request: SearchRequest):
             "total_embeddings": count,
         }
 
-    except ImportError:
+    except ImportError as e:
         raise HTTPException(
             status_code=501,
             detail="Embedding service not available in this deployment",
-        )
+        ) from e
 
 
 @router.get("/search/stats")
@@ -82,8 +82,7 @@ async def embedding_stats():
     pool = await get_pool()
     try:
         rows = await pool.fetch(
-            "SELECT source_type, COUNT(*) as count "
-            "FROM embeddings GROUP BY source_type ORDER BY source_type"
+            "SELECT source_type, COUNT(*) as count FROM embeddings GROUP BY source_type ORDER BY source_type"
         )
         total = sum(r["count"] for r in rows)
         return {

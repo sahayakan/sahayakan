@@ -46,7 +46,7 @@ class GeminiClient(LLMClient):
             except Exception as e:
                 last_exception = e
                 if attempt < self.MAX_RETRIES - 1:
-                    wait = self.BACKOFF_BASE ** attempt
+                    wait = self.BACKOFF_BASE**attempt
                     time.sleep(wait)
 
         raise last_exception

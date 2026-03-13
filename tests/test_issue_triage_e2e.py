@@ -14,23 +14,24 @@ from agents.dummy.agent import DummyAgent
 from agents.issue_triage.agent import IssueTriageAgent
 from llm_client.gemini_client import MockLLMClient
 
-
-MOCK_RESPONSE = json.dumps({
-    "summary": "Shell completion context cleanup issue",
-    "priority": "medium",
-    "priority_reasoning": "Code cleanup for shell completion, not a user-facing bug",
-    "is_duplicate": False,
-    "possible_duplicates": [],
-    "related_prs": [2799],
-    "related_jira_tickets": [],
-    "affected_components": ["shell-completion", "context-management"],
-    "suggested_labels": ["cleanup", "shell-completion"],
-    "suggested_actions": [
-        "Review the context lifecycle in shell completion",
-        "Check if related PR #2799 addresses the same concern",
-    ],
-    "confidence": 0.75,
-})
+MOCK_RESPONSE = json.dumps(
+    {
+        "summary": "Shell completion context cleanup issue",
+        "priority": "medium",
+        "priority_reasoning": "Code cleanup for shell completion, not a user-facing bug",
+        "is_duplicate": False,
+        "possible_duplicates": [],
+        "related_prs": [2799],
+        "related_jira_tickets": [],
+        "affected_components": ["shell-completion", "context-management"],
+        "suggested_labels": ["cleanup", "shell-completion"],
+        "suggested_actions": [
+            "Review the context lifecycle in shell completion",
+            "Check if related PR #2799 addresses the same concern",
+        ],
+        "confidence": 0.75,
+    }
+)
 
 
 async def main():
@@ -54,8 +55,7 @@ async def main():
     # Create a job for issue #2800
     params = json.dumps({"issue_id": 2800})
     row = await pool.fetchrow(
-        "INSERT INTO jobs (agent_name, status, parameters) "
-        "VALUES ('issue-triage', 'pending', $1::jsonb) RETURNING id",
+        "INSERT INTO jobs (agent_name, status, parameters) VALUES ('issue-triage', 'pending', $1::jsonb) RETURNING id",
         params,
     )
     job_id = row["id"]
@@ -80,25 +80,16 @@ async def main():
     job = await pool.fetchrow("SELECT * FROM jobs WHERE id = $1", job_id)
     print(f"\nJob status: {job['status']}")
 
-    run_row = await pool.fetchrow(
-        "SELECT * FROM agent_runs WHERE job_id = $1", job_id
-    )
+    run_row = await pool.fetchrow("SELECT * FROM agent_runs WHERE job_id = $1", job_id)
     print(f"Run status: {run_row['status']}")
-    print(
-        f"Git commit: "
-        f"{run_row['git_commit'][:8] if run_row['git_commit'] else 'None'}"
-    )
+    print(f"Git commit: {run_row['git_commit'][:8] if run_row['git_commit'] else 'None'}")
 
-    artifacts = await pool.fetch(
-        "SELECT * FROM artifacts WHERE run_id = $1", run_row["id"]
-    )
+    artifacts = await pool.fetch("SELECT * FROM artifacts WHERE run_id = $1", run_row["id"])
     print(f"Artifacts: {len(artifacts)}")
     for a in artifacts:
         print(f"  - {a['storage_uri']}")
 
-    llm_row = await pool.fetchrow(
-        "SELECT * FROM llm_usage WHERE run_id = $1", run_row["id"]
-    )
+    llm_row = await pool.fetchrow("SELECT * FROM llm_usage WHERE run_id = $1", run_row["id"])
     if llm_row:
         print(
             f"LLM usage: model={llm_row['model']}, "
@@ -107,16 +98,11 @@ async def main():
         )
 
     event = await pool.fetchrow(
-        "SELECT * FROM events WHERE event_type = 'issue.analyzed' "
-        "ORDER BY created_at DESC LIMIT 1"
+        "SELECT * FROM events WHERE event_type = 'issue.analyzed' ORDER BY created_at DESC LIMIT 1"
     )
     if event:
         print(f"Event: {event['event_type']}")
-        payload = (
-            json.loads(event["payload"])
-            if isinstance(event["payload"], str)
-            else event["payload"]
-        )
+        payload = json.loads(event["payload"]) if isinstance(event["payload"], str) else event["payload"]
         print(f"  priority: {payload.get('priority')}")
         print(f"  confidence: {payload.get('confidence')}")
 
@@ -124,7 +110,7 @@ async def main():
     report_path = "knowledge-cache/agent_outputs/issue_analysis/2800.md"
     try:
         with open(report_path) as f:
-            print(f"\n--- Generated Report ---")
+            print("\n--- Generated Report ---")
             print(f.read())
     except FileNotFoundError:
         print(f"Report not found at {report_path}")

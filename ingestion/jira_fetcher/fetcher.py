@@ -6,15 +6,13 @@ Fetches tickets from Jira and stores them in the knowledge cache.
 import base64
 import json
 import os
-import urllib.request
-import urllib.error
-from datetime import datetime, timezone
-from dataclasses import dataclass, field
-
 import sys
-sys.path.insert(
-    0, os.path.join(os.path.dirname(__file__), "..", "..", "data-plane")
-)
+import urllib.error
+import urllib.request
+from dataclasses import dataclass, field
+from datetime import UTC, datetime
+
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "..", "data-plane"))
 from agent_runner.knowledge import KnowledgeCache
 
 
@@ -41,9 +39,7 @@ class JiraFetcher:
     def _request(self, endpoint: str) -> dict:
         url = f"{self.base_url}/rest/api/3/{endpoint}"
         req = urllib.request.Request(url)
-        credentials = base64.b64encode(
-            f"{self.email}:{self.token}".encode()
-        ).decode()
+        credentials = base64.b64encode(f"{self.email}:{self.token}".encode()).decode()
         req.add_header("Authorization", f"Basic {credentials}")
         req.add_header("Accept", "application/json")
         req.add_header("User-Agent", "sahayakan-ingestion")
@@ -52,9 +48,7 @@ class JiraFetcher:
 
     def sync_project(self, project_key: str) -> SyncResult:
         """Sync all tickets from a Jira project."""
-        result = SyncResult(
-            timestamp=datetime.now(timezone.utc).isoformat()
-        )
+        result = SyncResult(timestamp=datetime.now(UTC).isoformat())
 
         try:
             start_at = 0
@@ -79,9 +73,7 @@ class JiraFetcher:
                         self._store_ticket(issue)
                         result.tickets_synced += 1
                     except Exception as e:
-                        result.errors.append(
-                            f"Failed to store {issue.get('key', '?')}: {e}"
-                        )
+                        result.errors.append(f"Failed to store {issue.get('key', '?')}: {e}")
 
                 start_at += len(issues)
                 if start_at >= data.get("total", 0):
@@ -95,10 +87,7 @@ class JiraFetcher:
             files = self.cache.list_files("jira/tickets", "*.json")
             if files:
                 self.cache.commit(
-                    message=(
-                        f"Jira sync: {result.tickets_synced} tickets "
-                        f"from {project_key}"
-                    ),
+                    message=(f"Jira sync: {result.tickets_synced} tickets from {project_key}"),
                     files=files,
                     agent_name="jira-ingestion",
                     source=f"Jira ({project_key})",
@@ -117,14 +106,14 @@ class JiraFetcher:
             if c.get("body"):
                 # Jira uses ADF format; extract text content
                 body = self._extract_adf_text(c["body"])
-            comments.append({
-                "id": c["id"],
-                "author": (
-                    c.get("author", {}).get("displayName", "Unknown")
-                ),
-                "body": body,
-                "created": c.get("created", ""),
-            })
+            comments.append(
+                {
+                    "id": c["id"],
+                    "author": (c.get("author", {}).get("displayName", "Unknown")),
+                    "body": body,
+                    "created": c.get("created", ""),
+                }
+            )
 
         description = ""
         if fields.get("description"):
@@ -134,27 +123,19 @@ class JiraFetcher:
             "key": issue["key"],
             "summary": fields.get("summary", ""),
             "description": description,
-            "status": (
-                fields.get("status", {}).get("name", "Unknown")
-            ),
-            "priority": (
-                fields.get("priority", {}).get("name", "None")
-            ),
+            "status": (fields.get("status", {}).get("name", "Unknown")),
+            "priority": (fields.get("priority", {}).get("name", "None")),
             "assignee": (
-                fields.get("assignee", {}).get("displayName", "Unassigned")
-                if fields.get("assignee")
-                else "Unassigned"
+                fields.get("assignee", {}).get("displayName", "Unassigned") if fields.get("assignee") else "Unassigned"
             ),
             "labels": fields.get("labels", []),
             "comments": comments,
             "created_at": fields.get("created", ""),
             "updated_at": fields.get("updated", ""),
-            "fetched_at": datetime.now(timezone.utc).isoformat(),
+            "fetched_at": datetime.now(UTC).isoformat(),
         }
 
-        self.cache.write_json(
-            f"jira/tickets/{issue['key']}.json", ticket_data
-        )
+        self.cache.write_json(f"jira/tickets/{issue['key']}.json", ticket_data)
 
     def _extract_adf_text(self, adf: dict) -> str:
         """Extract plain text from Atlassian Document Format."""

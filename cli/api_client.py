@@ -2,8 +2,8 @@
 
 import json
 import os
-import urllib.request
 import urllib.error
+import urllib.request
 
 API_URL = os.environ.get("SAHAYAKAN_API_URL", "http://localhost:8000")
 
@@ -18,7 +18,7 @@ def _request(method, path, body=None):
             return json.loads(resp.read().decode())
     except urllib.error.HTTPError as e:
         err = json.loads(e.read().decode())
-        raise SystemExit(f"Error: {err.get('detail', e.reason)}")
+        raise SystemExit(f"Error: {err.get('detail', e.reason)}") from e
 
 
 def get(path):

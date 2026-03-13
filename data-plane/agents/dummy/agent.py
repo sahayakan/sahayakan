@@ -1,6 +1,6 @@
 """Dummy agent for testing the full pipeline."""
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from agent_runner.contracts.base_agent import (
     AgentInput,
@@ -36,7 +36,7 @@ class DummyAgent(BaseAgent):
                 "agent": self.input.agent_name,
                 "job_id": self.input.job_id,
                 "parameters": self.input.parameters,
-                "timestamp": datetime.now(timezone.utc).isoformat(),
+                "timestamp": datetime.now(UTC).isoformat(),
             },
             artifacts=[
                 {

@@ -6,15 +6,13 @@ and stores them in the knowledge cache.
 
 import json
 import os
-import urllib.request
-import urllib.error
-from datetime import datetime, timezone
-from dataclasses import dataclass, field
-
 import sys
-sys.path.insert(
-    0, os.path.join(os.path.dirname(__file__), "..", "..", "data-plane")
-)
+import urllib.error
+import urllib.request
+from dataclasses import dataclass, field
+from datetime import UTC, datetime
+
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "..", "data-plane"))
 from agent_runner.knowledge import KnowledgeCache
 
 
@@ -58,13 +56,9 @@ class GitHubFetcher:
             page += 1
         return results
 
-    def sync_repo(
-        self, owner: str, repo: str, since: str | None = None
-    ) -> SyncResult:
+    def sync_repo(self, owner: str, repo: str, since: str | None = None) -> SyncResult:
         """Sync issues and PRs from a GitHub repository."""
-        result = SyncResult(
-            timestamp=datetime.now(timezone.utc).isoformat()
-        )
+        result = SyncResult(timestamp=datetime.now(UTC).isoformat())
 
         # Sync issues
         try:
@@ -81,18 +75,11 @@ class GitHubFetcher:
         # Commit to knowledge cache
         if result.issues_synced > 0 or result.prs_synced > 0:
             files = []
-            files.extend(
-                self.cache.list_files("github/issues", "*.json")
-            )
-            files.extend(
-                self.cache.list_files("github/pull_requests", "*.json")
-            )
+            files.extend(self.cache.list_files("github/issues", "*.json"))
+            files.extend(self.cache.list_files("github/pull_requests", "*.json"))
             if files:
                 self.cache.commit(
-                    message=(
-                        f"GitHub sync: {result.issues_synced} issues, "
-                        f"{result.prs_synced} PRs updated"
-                    ),
+                    message=(f"GitHub sync: {result.issues_synced} issues, {result.prs_synced} PRs updated"),
                     files=files,
                     agent_name="github-ingestion",
                     source=f"GitHub ({owner}/{repo})",
@@ -100,9 +87,7 @@ class GitHubFetcher:
 
         return result
 
-    def _sync_issues(
-        self, owner: str, repo: str, since: str | None = None
-    ) -> int:
+    def _sync_issues(self, owner: str, repo: str, since: str | None = None) -> int:
         url = f"{self.API_BASE}/repos/{owner}/{repo}/issues?state=all"
         params = ""
         if since:
@@ -137,30 +122,24 @@ class GitHubFetcher:
                 "number": issue["number"],
                 "title": issue["title"],
                 "body": issue.get("body", ""),
-                "labels": [l["name"] for l in issue.get("labels", [])],
+                "labels": [lbl["name"] for lbl in issue.get("labels", [])],
                 "state": issue["state"],
                 "user": issue["user"]["login"],
-                "assignees": [
-                    a["login"] for a in issue.get("assignees", [])
-                ],
+                "assignees": [a["login"] for a in issue.get("assignees", [])],
                 "comments": comments,
                 "created_at": issue["created_at"],
                 "updated_at": issue["updated_at"],
                 "closed_at": issue.get("closed_at"),
                 "html_url": issue["html_url"],
-                "fetched_at": datetime.now(timezone.utc).isoformat(),
+                "fetched_at": datetime.now(UTC).isoformat(),
             }
 
-            self.cache.write_json(
-                f"github/issues/{issue['number']}.json", issue_data
-            )
+            self.cache.write_json(f"github/issues/{issue['number']}.json", issue_data)
             count += 1
 
         return count
 
-    def _sync_prs(
-        self, owner: str, repo: str, since: str | None = None
-    ) -> int:
+    def _sync_prs(self, owner: str, repo: str, since: str | None = None) -> int:
         url = f"{self.API_BASE}/repos/{owner}/{repo}/pulls?state=all"
         params = ""
         if since:
@@ -172,10 +151,7 @@ class GitHubFetcher:
             # Fetch reviews
             reviews = []
             try:
-                reviews_url = (
-                    f"{self.API_BASE}/repos/{owner}/{repo}"
-                    f"/pulls/{pr['number']}/reviews"
-                )
+                reviews_url = f"{self.API_BASE}/repos/{owner}/{repo}/pulls/{pr['number']}/reviews"
                 reviews_raw = self._request_paginated(reviews_url)
                 reviews = [
                     {
@@ -195,7 +171,7 @@ class GitHubFetcher:
                 "body": pr.get("body", ""),
                 "state": pr["state"],
                 "user": pr["user"]["login"],
-                "labels": [l["name"] for l in pr.get("labels", [])],
+                "labels": [lbl["name"] for lbl in pr.get("labels", [])],
                 "base_branch": pr["base"]["ref"],
                 "head_branch": pr["head"]["ref"],
                 "merged": pr.get("merged_at") is not None,
@@ -208,12 +184,10 @@ class GitHubFetcher:
                 "changed_files": pr.get("changed_files"),
                 "additions": pr.get("additions"),
                 "deletions": pr.get("deletions"),
-                "fetched_at": datetime.now(timezone.utc).isoformat(),
+                "fetched_at": datetime.now(UTC).isoformat(),
             }
 
-            self.cache.write_json(
-                f"github/pull_requests/{pr['number']}.json", pr_data
-            )
+            self.cache.write_json(f"github/pull_requests/{pr['number']}.json", pr_data)
             count += 1
 
         return count
@@ -226,9 +200,7 @@ class GitHubFetcher:
         comments = []
         if issue.get("comments", 0) > 0:
             try:
-                comments_raw = self._request_paginated(
-                    issue["comments_url"]
-                )
+                comments_raw = self._request_paginated(issue["comments_url"])
                 comments = [
                     {
                         "id": c["id"],
@@ -245,21 +217,17 @@ class GitHubFetcher:
             "number": issue["number"],
             "title": issue["title"],
             "body": issue.get("body", ""),
-            "labels": [l["name"] for l in issue.get("labels", [])],
+            "labels": [lbl["name"] for lbl in issue.get("labels", [])],
             "state": issue["state"],
             "user": issue["user"]["login"],
-            "assignees": [
-                a["login"] for a in issue.get("assignees", [])
-            ],
+            "assignees": [a["login"] for a in issue.get("assignees", [])],
             "comments": comments,
             "created_at": issue["created_at"],
             "updated_at": issue["updated_at"],
             "closed_at": issue.get("closed_at"),
             "html_url": issue["html_url"],
-            "fetched_at": datetime.now(timezone.utc).isoformat(),
+            "fetched_at": datetime.now(UTC).isoformat(),
         }
 
-        self.cache.write_json(
-            f"github/issues/{number}.json", issue_data
-        )
+        self.cache.write_json(f"github/issues/{number}.json", issue_data)
         return issue_data

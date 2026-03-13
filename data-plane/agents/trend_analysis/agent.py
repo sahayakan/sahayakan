@@ -3,7 +3,7 @@
 import json
 import re
 from collections import Counter
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 from agent_runner.contracts.base_agent import AgentInput, AgentOutput, BaseAgent
@@ -15,7 +15,13 @@ PROMPT_PATH = Path(__file__).parent.parent.parent / "prompts" / "trend_analysis.
 
 
 class TrendAnalysisAgent(BaseAgent):
-    def __init__(self, knowledge_cache: KnowledgeCache, logger: AgentLogger, llm_client: LLMClient | None = None, embedding_service=None):
+    def __init__(
+        self,
+        knowledge_cache: KnowledgeCache,
+        logger: AgentLogger,
+        llm_client: LLMClient | None = None,
+        embedding_service=None,
+    ):
         self.cache = knowledge_cache
         self.log = logger
         self.llm = llm_client
@@ -43,11 +49,13 @@ class TrendAnalysisAgent(BaseAgent):
                 priority_counter[data.get("priority", "unknown")] += 1
                 for comp in data.get("affected_components", []):
                     component_counter[comp] += 1
-                recent_issues.append({
-                    "number": data.get("issue_number"),
-                    "priority": data.get("priority"),
-                    "components": data.get("affected_components", []),
-                })
+                recent_issues.append(
+                    {
+                        "number": data.get("issue_number"),
+                        "priority": data.get("priority"),
+                        "components": data.get("affected_components", []),
+                    }
+                )
             except Exception:
                 pass
 
@@ -55,11 +63,13 @@ class TrendAnalysisAgent(BaseAgent):
             try:
                 data = self.cache.read_json(f)
                 risk_counter[data.get("risk_level", "unknown")] += 1
-                recent_prs.append({
-                    "number": data.get("pr_number"),
-                    "risk": data.get("risk_level"),
-                    "type": data.get("change_type"),
-                })
+                recent_prs.append(
+                    {
+                        "number": data.get("pr_number"),
+                        "risk": data.get("risk_level"),
+                        "type": data.get("change_type"),
+                    }
+                )
             except Exception:
                 pass
 
@@ -75,7 +85,9 @@ class TrendAnalysisAgent(BaseAgent):
             "recent_issues": recent_issues[-10:],
             "recent_prs": recent_prs[-10:],
         }
-        self.log.info(f"Metrics: {self.metrics['total_issues']} issues, {self.metrics['total_prs']} PRs, {self.metrics['total_meetings']} meetings")
+        self.log.info(
+            f"Metrics: {self.metrics['total_issues']} issues, {self.metrics['total_prs']} PRs, {self.metrics['total_meetings']} meetings"
+        )
 
     def analyze(self) -> None:
         if not self.llm:
@@ -95,24 +107,40 @@ class TrendAnalysisAgent(BaseAgent):
 
         self.log.info(f"Sending prompt to LLM ({len(prompt)} chars)")
         response = self.llm.generate(prompt)
-        self.log.llm(model=response.model, tokens=response.tokens_input + response.tokens_output, latency_ms=response.latency_ms)
-        self.llm_usage = {"model": response.model, "tokens_input": response.tokens_input, "tokens_output": response.tokens_output, "latency_ms": response.latency_ms}
+        self.log.llm(
+            model=response.model, tokens=response.tokens_input + response.tokens_output, latency_ms=response.latency_ms
+        )
+        self.llm_usage = {
+            "model": response.model,
+            "tokens_input": response.tokens_input,
+            "tokens_output": response.tokens_output,
+            "latency_ms": response.latency_ms,
+        }
 
         try:
             text = response.text.strip()
             if text.startswith("```"):
-                text = re.sub(r'^```\w*\n?', '', text)
-                text = re.sub(r'\n?```$', '', text)
+                text = re.sub(r"^```\w*\n?", "", text)
+                text = re.sub(r"\n?```$", "", text)
             self.analysis = json.loads(text)
         except json.JSONDecodeError as e:
             self.log.error(f"Failed to parse LLM response: {e}")
-            self.analysis = {"summary": "Parse failure", "issue_trends": [], "risk_areas": [], "positive_signals": [], "recommendations": [], "health_score": 0.5}
+            self.analysis = {
+                "summary": "Parse failure",
+                "issue_trends": [],
+                "risk_areas": [],
+                "positive_signals": [],
+                "recommendations": [],
+                "health_score": 0.5,
+            }
 
-        self.log.info(f"Trends: health_score={self.analysis.get('health_score', '?')}, {len(self.analysis.get('recommendations', []))} recommendations")
+        self.log.info(
+            f"Trends: health_score={self.analysis.get('health_score', '?')}, {len(self.analysis.get('recommendations', []))} recommendations"
+        )
 
     def generate_output(self) -> AgentOutput:
-        timestamp = datetime.now(timezone.utc).isoformat()
-        date_str = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+        timestamp = datetime.now(UTC).isoformat()
+        date_str = datetime.now(UTC).strftime("%Y-%m-%d")
         output_data = {**self.analysis, "metrics": self.metrics, "llm_usage": self.llm_usage, "generated_at": timestamp}
         return AgentOutput(
             status="success",
@@ -140,11 +168,15 @@ class TrendAnalysisAgent(BaseAgent):
         metrics = data.get("metrics", {})
         lines = [
             "# Development Trend Report",
-            "", f"**Generated by:** trend-analysis agent",
+            "",
+            "**Generated by:** trend-analysis agent",
             f"**Date:** {data.get('generated_at', 'N/A')}",
             f"**Health Score:** {data.get('health_score', 0):.0%}",
-            "", f"**Data:** {metrics.get('total_issues', 0)} issues, {metrics.get('total_prs', 0)} PRs, {metrics.get('total_meetings', 0)} meetings",
-            "", "## Summary", data.get("summary", "N/A"),
+            "",
+            f"**Data:** {metrics.get('total_issues', 0)} issues, {metrics.get('total_prs', 0)} PRs, {metrics.get('total_meetings', 0)} meetings",
+            "",
+            "## Summary",
+            data.get("summary", "N/A"),
         ]
         if data.get("issue_trends"):
             lines.extend(["", "## Issue Trends"])
@@ -157,8 +189,12 @@ class TrendAnalysisAgent(BaseAgent):
         if data.get("recommendations"):
             lines.extend(["", "## Recommendations"] + [f"{i}. {r}" for i, r in enumerate(data["recommendations"], 1)])
         if metrics.get("priority_distribution"):
-            lines.extend(["", "## Priority Distribution"] + [f"- {k}: {v}" for k, v in metrics["priority_distribution"].items()])
+            lines.extend(
+                ["", "## Priority Distribution"] + [f"- {k}: {v}" for k, v in metrics["priority_distribution"].items()]
+            )
         if metrics.get("risk_distribution"):
-            lines.extend(["", "## Risk Distribution"] + [f"- {k}: {v}" for k, v in metrics["risk_distribution"].items()])
+            lines.extend(
+                ["", "## Risk Distribution"] + [f"- {k}: {v}" for k, v in metrics["risk_distribution"].items()]
+            )
         lines.extend(["", "---", f"*Job ID: {self.input.job_id if self.input else 'N/A'}*", ""])
         return "\n".join(lines)

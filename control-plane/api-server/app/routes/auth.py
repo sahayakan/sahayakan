@@ -1,20 +1,29 @@
 """Authentication management API endpoints."""
 
-import json
+from typing import Annotated
 
-from fastapi import APIRouter, HTTPException, Depends
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 
 from app.auth import (
-    AuthContext, get_auth_context, require_scope,
-    generate_api_key, hash_api_key, log_audit,
+    AuthContext,
+    generate_api_key,
+    get_auth_context,
+    hash_api_key,
+    log_audit,
+    require_scope,
 )
 from app.database import get_pool
 
 router = APIRouter(tags=["auth"])
 
+AdminAuth = Annotated[AuthContext, Depends(require_scope("admin"))]
+ReadAuth = Annotated[AuthContext, Depends(require_scope("read"))]
+CurrentAuth = Annotated[AuthContext, Depends(get_auth_context)]
+
 
 # --- Team management ---
+
 
 class TeamCreate(BaseModel):
     name: str
@@ -22,29 +31,31 @@ class TeamCreate(BaseModel):
 
 
 @router.post("/teams", status_code=201)
-async def create_team(team: TeamCreate, auth: AuthContext = Depends(require_scope("admin"))):
+async def create_team(team: TeamCreate, auth: AdminAuth):
     pool = await get_pool()
     try:
         row = await pool.fetchrow(
             "INSERT INTO teams (name, description) VALUES ($1, $2) RETURNING *",
-            team.name, team.description,
+            team.name,
+            team.description,
         )
     except Exception as e:
         if "unique" in str(e).lower():
-            raise HTTPException(status_code=409, detail=f"Team '{team.name}' already exists")
+            raise HTTPException(status_code=409, detail=f"Team '{team.name}' already exists") from e
         raise
     await log_audit(pool, auth, "team.created", "team", str(row["id"]))
     return dict(row)
 
 
 @router.get("/teams")
-async def list_teams(auth: AuthContext = Depends(require_scope("read"))):
+async def list_teams(auth: ReadAuth):
     pool = await get_pool()
     rows = await pool.fetch("SELECT * FROM teams ORDER BY name")
     return {"teams": [dict(r) for r in rows]}
 
 
 # --- API Key management ---
+
 
 class ApiKeyCreate(BaseModel):
     name: str
@@ -53,7 +64,7 @@ class ApiKeyCreate(BaseModel):
 
 
 @router.post("/api-keys", status_code=201)
-async def create_api_key(key_req: ApiKeyCreate, auth: AuthContext = Depends(require_scope("admin"))):
+async def create_api_key(key_req: ApiKeyCreate, auth: AdminAuth):
     pool = await get_pool()
 
     if key_req.team_id:
@@ -72,7 +83,11 @@ async def create_api_key(key_req: ApiKeyCreate, auth: AuthContext = Depends(requ
     row = await pool.fetchrow(
         "INSERT INTO api_keys (key_hash, key_prefix, name, team_id, scopes) "
         "VALUES ($1, $2, $3, $4, $5) RETURNING id, key_prefix, name, team_id, scopes, created_at",
-        key_hash, prefix, key_req.name, key_req.team_id, key_req.scopes,
+        key_hash,
+        prefix,
+        key_req.name,
+        key_req.team_id,
+        key_req.scopes,
     )
 
     await log_audit(pool, auth, "api_key.created", "api_key", str(row["id"]))
@@ -83,7 +98,7 @@ async def create_api_key(key_req: ApiKeyCreate, auth: AuthContext = Depends(requ
 
 
 @router.get("/api-keys")
-async def list_api_keys(auth: AuthContext = Depends(require_scope("admin"))):
+async def list_api_keys(auth: AdminAuth):
     pool = await get_pool()
     rows = await pool.fetch(
         "SELECT id, key_prefix, name, team_id, scopes, created_at, "
@@ -93,11 +108,9 @@ async def list_api_keys(auth: AuthContext = Depends(require_scope("admin"))):
 
 
 @router.delete("/api-keys/{key_id}")
-async def revoke_api_key(key_id: int, auth: AuthContext = Depends(require_scope("admin"))):
+async def revoke_api_key(key_id: int, auth: AdminAuth):
     pool = await get_pool()
-    result = await pool.execute(
-        "UPDATE api_keys SET enabled = FALSE WHERE id = $1", key_id
-    )
+    result = await pool.execute("UPDATE api_keys SET enabled = FALSE WHERE id = $1", key_id)
     if result == "UPDATE 0":
         raise HTTPException(status_code=404, detail="API key not found")
     await log_audit(pool, auth, "api_key.revoked", "api_key", str(key_id))
@@ -106,12 +119,13 @@ async def revoke_api_key(key_id: int, auth: AuthContext = Depends(require_scope(
 
 # --- Audit log ---
 
+
 @router.get("/audit-log")
 async def list_audit_log(
+    auth: AdminAuth,
     limit: int = 50,
     offset: int = 0,
     action: str | None = None,
-    auth: AuthContext = Depends(require_scope("admin")),
 ):
     pool = await get_pool()
     query = (
@@ -138,8 +152,9 @@ async def list_audit_log(
 
 # --- Auth info ---
 
+
 @router.get("/auth/me")
-async def auth_info(auth: AuthContext = Depends(get_auth_context)):
+async def auth_info(auth: CurrentAuth):
     return {
         "authenticated": auth.is_authenticated,
         "key_name": auth.key_name,

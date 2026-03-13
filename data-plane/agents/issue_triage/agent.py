@@ -2,7 +2,7 @@
 
 import json
 import re
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 from agent_runner.contracts.base_agent import (
@@ -13,7 +13,6 @@ from agent_runner.contracts.base_agent import (
 from agent_runner.knowledge import KnowledgeCache
 from agent_runner.logging_utils import AgentLogger
 from llm_client.base import LLMClient
-
 
 PROMPT_TEMPLATE_PATH = Path(__file__).parent.parent.parent / "prompts" / "issue_analysis.prompt"
 
@@ -44,15 +43,10 @@ class IssueTriageAgent(BaseAgent):
 
         issue_path = f"github/issues/{issue_id}.json"
         if not self.cache.file_exists(issue_path):
-            raise ValueError(
-                f"Issue {issue_id} not found in knowledge cache. "
-                f"Run GitHub sync first."
-            )
+            raise ValueError(f"Issue {issue_id} not found in knowledge cache. Run GitHub sync first.")
 
         self.issue_data = self.cache.read_json(issue_path)
-        self.log.info(
-            f"Loaded issue #{issue_id}: {self.issue_data.get('title', 'N/A')}"
-        )
+        self.log.info(f"Loaded issue #{issue_id}: {self.issue_data.get('title', 'N/A')}")
 
     def collect_context(self) -> None:
         if self.embedding_service:
@@ -69,12 +63,17 @@ class IssueTriageAgent(BaseAgent):
 
         async def _search():
             from agent_runner.semantic_context import (
-                find_similar_issues, find_related_prs,
-                find_related_jira, find_related_reports,
+                find_related_jira,
+                find_related_prs,
+                find_related_reports,
+                find_similar_issues,
             )
+
             similar = await find_similar_issues(
-                self.embedding_service, query,
-                exclude_id=str(issue_num), limit=10,
+                self.embedding_service,
+                query,
+                exclude_id=str(issue_num),
+                limit=10,
             )
             prs = await find_related_prs(self.embedding_service, query, limit=10)
             jira = await find_related_jira(self.embedding_service, query, limit=10)
@@ -84,18 +83,32 @@ class IssueTriageAgent(BaseAgent):
         similar, prs, jira, reports = asyncio.get_event_loop().run_until_complete(_search())
 
         similar_issues = [
-            {"number": int(r["source_id"]), "summary": (r.get("metadata") or {}).get("title", ""), "similarity": r["similarity"]}
+            {
+                "number": int(r["source_id"]),
+                "summary": (r.get("metadata") or {}).get("title", ""),
+                "similarity": r["similarity"],
+            }
             for r in similar
         ]
         related_prs = [
-            {"number": int(r["source_id"]), "title": (r.get("metadata") or {}).get("title", ""), "similarity": r["similarity"]}
+            {
+                "number": int(r["source_id"]),
+                "title": (r.get("metadata") or {}).get("title", ""),
+                "similarity": r["similarity"],
+            }
             for r in prs
         ]
         related_jira = [
-            {"key": r["source_id"], "summary": (r.get("metadata") or {}).get("summary", ""), "similarity": r["similarity"]}
+            {
+                "key": r["source_id"],
+                "summary": (r.get("metadata") or {}).get("summary", ""),
+                "similarity": r["similarity"],
+            }
             for r in jira
         ]
-        self.log.info(f"Semantic search: {len(similar_issues)} similar issues, {len(related_prs)} related PRs, {len(related_jira)} Jira tickets")
+        self.log.info(
+            f"Semantic search: {len(similar_issues)} similar issues, {len(related_prs)} related PRs, {len(related_jira)} Jira tickets"
+        )
 
         self.context = {
             "similar_issues": similar_issues,
@@ -108,33 +121,29 @@ class IssueTriageAgent(BaseAgent):
         issue_num = self.issue_data["number"]
         issue_title = self.issue_data.get("title", "").lower()
         issue_body = (self.issue_data.get("body") or "").lower()
-        keywords = set(
-            re.findall(r'\b[a-z]{3,}\b', f"{issue_title} {issue_body}")
-        )
+        keywords = set(re.findall(r"\b[a-z]{3,}\b", f"{issue_title} {issue_body}"))
 
         # Find previous issue analyses
         similar_issues = []
-        analysis_files = self.cache.list_files(
-            "agent_outputs/issue_analysis", "*.json"
-        )
+        analysis_files = self.cache.list_files("agent_outputs/issue_analysis", "*.json")
         for f in analysis_files:
             try:
                 analysis = self.cache.read_json(f)
                 if analysis.get("issue_number") != issue_num:
-                    similar_issues.append({
-                        "number": analysis.get("issue_number"),
-                        "summary": analysis.get("summary", ""),
-                        "priority": analysis.get("priority", ""),
-                    })
+                    similar_issues.append(
+                        {
+                            "number": analysis.get("issue_number"),
+                            "summary": analysis.get("summary", ""),
+                            "priority": analysis.get("priority", ""),
+                        }
+                    )
             except Exception:
                 pass
         self.log.info(f"Found {len(similar_issues)} previous analyses")
 
         # Find related PRs by scanning PR data
         related_prs = []
-        pr_files = self.cache.list_files(
-            "github/pull_requests", "*.json"
-        )
+        pr_files = self.cache.list_files("github/pull_requests", "*.json")
         for f in pr_files:
             try:
                 pr = self.cache.read_json(f)
@@ -143,21 +152,25 @@ class IssueTriageAgent(BaseAgent):
                 pr_text = f"{pr_title} {pr_body}"
 
                 if f"#{issue_num}" in pr_text:
-                    related_prs.append({
-                        "number": pr["number"],
-                        "title": pr.get("title", ""),
-                        "state": pr.get("state", ""),
-                    })
+                    related_prs.append(
+                        {
+                            "number": pr["number"],
+                            "title": pr.get("title", ""),
+                            "state": pr.get("state", ""),
+                        }
+                    )
                     continue
 
-                pr_keywords = set(re.findall(r'\b[a-z]{3,}\b', pr_text))
+                pr_keywords = set(re.findall(r"\b[a-z]{3,}\b", pr_text))
                 overlap = keywords & pr_keywords
                 if len(overlap) > 5:
-                    related_prs.append({
-                        "number": pr["number"],
-                        "title": pr.get("title", ""),
-                        "state": pr.get("state", ""),
-                    })
+                    related_prs.append(
+                        {
+                            "number": pr["number"],
+                            "title": pr.get("title", ""),
+                            "state": pr.get("state", ""),
+                        }
+                    )
             except Exception:
                 pass
         self.log.info(f"Found {len(related_prs)} related PRs")
@@ -168,30 +181,29 @@ class IssueTriageAgent(BaseAgent):
         for f in jira_files:
             try:
                 ticket = self.cache.read_json(f)
-                ticket_text = (
-                    f"{ticket.get('summary', '')} "
-                    f"{ticket.get('description', '')}"
-                ).lower()
+                ticket_text = (f"{ticket.get('summary', '')} {ticket.get('description', '')}").lower()
 
                 ticket_key = ticket.get("key", "")
                 if ticket_key and ticket_key.lower() in issue_body:
-                    related_jira.append({
-                        "key": ticket_key,
-                        "summary": ticket.get("summary", ""),
-                        "status": ticket.get("status", ""),
-                    })
+                    related_jira.append(
+                        {
+                            "key": ticket_key,
+                            "summary": ticket.get("summary", ""),
+                            "status": ticket.get("status", ""),
+                        }
+                    )
                     continue
 
-                jira_keywords = set(
-                    re.findall(r'\b[a-z]{3,}\b', ticket_text)
-                )
+                jira_keywords = set(re.findall(r"\b[a-z]{3,}\b", ticket_text))
                 overlap = keywords & jira_keywords
                 if len(overlap) > 5:
-                    related_jira.append({
-                        "key": ticket_key,
-                        "summary": ticket.get("summary", ""),
-                        "status": ticket.get("status", ""),
-                    })
+                    related_jira.append(
+                        {
+                            "key": ticket_key,
+                            "summary": ticket.get("summary", ""),
+                            "status": ticket.get("status", ""),
+                        }
+                    )
             except Exception:
                 pass
         self.log.info(f"Found {len(related_jira)} related Jira tickets")
@@ -213,8 +225,7 @@ class IssueTriageAgent(BaseAgent):
         comments_text = "None"
         if self.issue_data.get("comments"):
             comments_text = "\n".join(
-                f"- {c.get('user', '?')}: {c.get('body', '')[:200]}"
-                for c in self.issue_data["comments"][:10]
+                f"- {c.get('user', '?')}: {c.get('body', '')[:200]}" for c in self.issue_data["comments"][:10]
             )
 
         prompt = prompt_template.format(
@@ -222,26 +233,18 @@ class IssueTriageAgent(BaseAgent):
             body=self.issue_data.get("body", "") or "No description",
             labels=", ".join(self.issue_data.get("labels", [])) or "None",
             comments=comments_text,
-            similar_issues=json.dumps(
-                self.context["similar_issues"], indent=2
-            )
+            similar_issues=json.dumps(self.context["similar_issues"], indent=2)
             if self.context["similar_issues"]
             else "None found",
-            related_prs=json.dumps(
-                self.context["related_prs"], indent=2
-            )
+            related_prs=json.dumps(self.context["related_prs"], indent=2)
             if self.context["related_prs"]
             else "None found",
-            jira_tickets=json.dumps(
-                self.context["related_jira"], indent=2
-            )
+            jira_tickets=json.dumps(self.context["related_jira"], indent=2)
             if self.context["related_jira"]
             else "None found",
         )
 
-        self.log.info(
-            f"Sending prompt to LLM ({len(prompt)} chars)"
-        )
+        self.log.info(f"Sending prompt to LLM ({len(prompt)} chars)")
         response = self.llm.generate(prompt)
 
         self.log.llm(
@@ -262,8 +265,8 @@ class IssueTriageAgent(BaseAgent):
             text = response.text.strip()
             # Strip markdown code fences if present
             if text.startswith("```"):
-                text = re.sub(r'^```\w*\n?', '', text)
-                text = re.sub(r'\n?```$', '', text)
+                text = re.sub(r"^```\w*\n?", "", text)
+                text = re.sub(r"\n?```$", "", text)
             self.analysis = json.loads(text)
         except json.JSONDecodeError as e:
             self.log.error(f"Failed to parse LLM response as JSON: {e}")
@@ -290,7 +293,7 @@ class IssueTriageAgent(BaseAgent):
 
     def generate_output(self) -> AgentOutput:
         issue_num = self.issue_data["number"]
-        timestamp = datetime.now(timezone.utc).isoformat()
+        timestamp = datetime.now(UTC).isoformat()
 
         output_data = {
             "issue_number": issue_num,
@@ -298,15 +301,9 @@ class IssueTriageAgent(BaseAgent):
             "issue_url": self.issue_data.get("html_url", ""),
             **self.analysis,
             "context_used": {
-                "similar_issues_count": len(
-                    self.context.get("similar_issues", [])
-                ),
-                "related_prs_count": len(
-                    self.context.get("related_prs", [])
-                ),
-                "related_jira_count": len(
-                    self.context.get("related_jira", [])
-                ),
+                "similar_issues_count": len(self.context.get("similar_issues", [])),
+                "related_prs_count": len(self.context.get("related_prs", [])),
+                "related_jira_count": len(self.context.get("related_jira", [])),
             },
             "llm_usage": self.llm_usage,
             "generated_at": timestamp,
@@ -359,7 +356,7 @@ class IssueTriageAgent(BaseAgent):
         lines = [
             f"# Issue Analysis: #{issue_num} - {title}",
             "",
-            f"**Generated by:** issue-triage agent",
+            "**Generated by:** issue-triage agent",
             f"**Date:** {data.get('generated_at', 'N/A')}",
             f"**Confidence:** {confidence}",
             "",
@@ -412,7 +409,7 @@ class IssueTriageAgent(BaseAgent):
         labels = data.get("suggested_labels", [])
         if labels:
             lines.append("## Suggested Labels")
-            lines.append(", ".join(f"`{l}`" for l in labels))
+            lines.append(", ".join(f"`{lbl}`" for lbl in labels))
             lines.append("")
 
         # Suggested actions
@@ -423,9 +420,11 @@ class IssueTriageAgent(BaseAgent):
                 lines.append(f"{i}. {action}")
             lines.append("")
 
-        lines.extend([
-            "---",
-            f"*Job ID: {self.input.job_id if self.input else 'N/A'}*",
-        ])
+        lines.extend(
+            [
+                "---",
+                f"*Job ID: {self.input.job_id if self.input else 'N/A'}*",
+            ]
+        )
 
         return "\n".join(lines) + "\n"

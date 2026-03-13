@@ -1,6 +1,7 @@
 """Unit tests for input sanitization."""
 
 import sys
+
 sys.path.insert(0, "data-plane")
 
 from agent_runner.sanitize import sanitize_for_llm

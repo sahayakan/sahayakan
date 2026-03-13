@@ -4,7 +4,7 @@ Supports: minute hour day_of_month month day_of_week
 Values: number, *, */N, comma-separated
 """
 
-from datetime import datetime, timezone
+from datetime import datetime
 
 
 def _match_field(field: str, value: int, max_val: int) -> bool:

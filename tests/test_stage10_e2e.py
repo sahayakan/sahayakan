@@ -12,73 +12,88 @@ import asyncpg
 from agent_runner.knowledge import KnowledgeCache
 from agent_runner.runner import AgentRunner
 from agents.dummy.agent import DummyAgent
-from agents.issue_triage.agent import IssueTriageAgent
-from agents.pr_context.agent import PRContextAgent
-from agents.meeting_summary.agent import MeetingSummaryAgent
-from agents.slack_digest.agent import SlackDigestAgent
 from agents.insights.agent import InsightsAgent
+from agents.issue_triage.agent import IssueTriageAgent
+from agents.meeting_summary.agent import MeetingSummaryAgent
+from agents.pr_context.agent import PRContextAgent
+from agents.slack_digest.agent import SlackDigestAgent
 from agents.trend_analysis.agent import TrendAnalysisAgent
 from llm_client.gemini_client import MockLLMClient
 
-INSIGHTS_MOCK = json.dumps({
-    "insights": [
-        {
-            "insight_type": "recurring_bug",
-            "title": "Repeated shell completion issues",
-            "description": "Multiple issues related to shell completion context handling detected across recent analyses.",
-            "evidence": [
-                {"type": "issue", "id": 2800, "detail": "Context cleanup in shell completion"},
-            ],
-            "severity": "medium",
-            "confidence": 0.72,
-        },
-        {
-            "insight_type": "process_gap",
-            "title": "Action items not tracked in Jira",
-            "description": "Meeting action items reference GitHub issues but not Jira tickets, suggesting a gap in project tracking.",
-            "evidence": [
-                {"type": "meeting", "id": "2026-03-13-standup", "detail": "Action items without Jira references"},
-            ],
-            "severity": "low",
-            "confidence": 0.61,
-        },
-    ]
-})
+INSIGHTS_MOCK = json.dumps(
+    {
+        "insights": [
+            {
+                "insight_type": "recurring_bug",
+                "title": "Repeated shell completion issues",
+                "description": "Multiple issues related to shell completion context handling detected across recent analyses.",
+                "evidence": [
+                    {"type": "issue", "id": 2800, "detail": "Context cleanup in shell completion"},
+                ],
+                "severity": "medium",
+                "confidence": 0.72,
+            },
+            {
+                "insight_type": "process_gap",
+                "title": "Action items not tracked in Jira",
+                "description": "Meeting action items reference GitHub issues but not Jira tickets, suggesting a gap in project tracking.",
+                "evidence": [
+                    {"type": "meeting", "id": "2026-03-13-standup", "detail": "Action items without Jira references"},
+                ],
+                "severity": "low",
+                "confidence": 0.61,
+            },
+        ]
+    }
+)
 
-TRENDS_MOCK = json.dumps({
-    "summary": "Development activity is steady with moderate risk levels. Shell completion area shows recurring issues.",
-    "issue_trends": [
-        {"component": "shell-completion", "trend": "increasing", "detail": "Multiple related issues in recent period"},
-    ],
-    "risk_areas": ["shell-completion", "context-management"],
-    "positive_signals": ["PR review process working well", "Meeting action items being tracked"],
-    "recommendations": [
-        "Prioritize shell completion fixes",
-        "Add Jira tracking for meeting action items",
-    ],
-    "health_score": 0.72,
-})
+TRENDS_MOCK = json.dumps(
+    {
+        "summary": "Development activity is steady with moderate risk levels. Shell completion area shows recurring issues.",
+        "issue_trends": [
+            {
+                "component": "shell-completion",
+                "trend": "increasing",
+                "detail": "Multiple related issues in recent period",
+            },
+        ],
+        "risk_areas": ["shell-completion", "context-management"],
+        "positive_signals": ["PR review process working well", "Meeting action items being tracked"],
+        "recommendations": [
+            "Prioritize shell completion fixes",
+            "Add Jira tracking for meeting action items",
+        ],
+        "health_score": 0.72,
+    }
+)
 
 
 async def main():
     pool = await asyncpg.create_pool(
-        user="sahayakan", password="sahayakan_dev_password",
-        database="sahayakan", host="localhost", port=5433,
-        min_size=1, max_size=5,
+        user="sahayakan",
+        password="sahayakan_dev_password",
+        database="sahayakan",
+        host="localhost",
+        port=5433,
+        min_size=1,
+        max_size=5,
     )
     cache = KnowledgeCache("knowledge-cache")
     registry = {
-        "dummy": DummyAgent, "issue-triage": IssueTriageAgent,
-        "pr-context": PRContextAgent, "meeting-summary": MeetingSummaryAgent,
-        "slack-digest": SlackDigestAgent, "insights": InsightsAgent,
+        "dummy": DummyAgent,
+        "issue-triage": IssueTriageAgent,
+        "pr-context": PRContextAgent,
+        "meeting-summary": MeetingSummaryAgent,
+        "slack-digest": SlackDigestAgent,
+        "insights": InsightsAgent,
         "trend-analysis": TrendAnalysisAgent,
     }
 
     for name, desc in [("insights", "Detects patterns"), ("trend-analysis", "Produces trend reports")]:
         await pool.execute(
-            "INSERT INTO agents (name, version, description) "
-            "VALUES ($1, '1.0', $2) ON CONFLICT (name) DO NOTHING",
-            name, desc,
+            "INSERT INTO agents (name, version, description) VALUES ($1, '1.0', $2) ON CONFLICT (name) DO NOTHING",
+            name,
+            desc,
         )
 
     # --- Test 1: Insights Agent ---
@@ -87,8 +102,8 @@ async def main():
     print("=" * 60)
     params = json.dumps({"source": "scheduled"})
     row = await pool.fetchrow(
-        "INSERT INTO jobs (agent_name, status, parameters) "
-        "VALUES ('insights', 'pending', $1::jsonb) RETURNING id", params,
+        "INSERT INTO jobs (agent_name, status, parameters) VALUES ('insights', 'pending', $1::jsonb) RETURNING id",
+        params,
     )
     llm = MockLLMClient(INSIGHTS_MOCK)
     runner = AgentRunner(db_pool=pool, knowledge_cache=cache, agent_registry=registry, llm_client=llm)
@@ -102,13 +117,19 @@ async def main():
     assert job["status"] == "completed"
 
     # Store insights in DB
-    report = cache.read_json(f"agent_outputs/insights/{__import__('datetime').datetime.utcnow().strftime('%Y-%m-%d')}.json")
+    report = cache.read_json(
+        f"agent_outputs/insights/{__import__('datetime').datetime.utcnow().strftime('%Y-%m-%d')}.json"
+    )
     for ins in report.get("insights", []):
         await pool.execute(
             "INSERT INTO insights (insight_type, title, description, evidence, severity, confidence) "
             "VALUES ($1, $2, $3, $4::jsonb, $5, $6)",
-            ins["insight_type"], ins["title"], ins["description"],
-            json.dumps(ins.get("evidence", [])), ins["severity"], ins["confidence"],
+            ins["insight_type"],
+            ins["title"],
+            ins["description"],
+            json.dumps(ins.get("evidence", [])),
+            ins["severity"],
+            ins["confidence"],
         )
     print(f"Stored {len(report.get('insights', []))} insights in database")
 
@@ -120,7 +141,8 @@ async def main():
     params2 = json.dumps({"source": "scheduled"})
     row2 = await pool.fetchrow(
         "INSERT INTO jobs (agent_name, status, parameters) "
-        "VALUES ('trend-analysis', 'pending', $1::jsonb) RETURNING id", params2,
+        "VALUES ('trend-analysis', 'pending', $1::jsonb) RETURNING id",
+        params2,
     )
     llm2 = MockLLMClient(TRENDS_MOCK)
     runner2 = AgentRunner(db_pool=pool, knowledge_cache=cache, agent_registry=registry, llm_client=llm2)
@@ -184,6 +206,7 @@ async def main():
         print(f"{'OK' if exists else 'MISSING'}: {path}")
 
     import subprocess
+
     result = subprocess.run(["git", "log", "--oneline", "-3"], cwd="knowledge-cache", capture_output=True, text=True)
     print(f"\nKnowledge cache git log:\n{result.stdout}")
 

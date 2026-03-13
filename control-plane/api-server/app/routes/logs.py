@@ -1,7 +1,7 @@
 from fastapi import APIRouter, HTTPException
 
 from app.database import get_pool
-from app.log_store import get_logs, get_log_count
+from app.log_store import get_log_count, get_logs
 
 router = APIRouter(prefix="/logs", tags=["logs"])
 

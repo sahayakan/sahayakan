@@ -9,17 +9,17 @@ DATA_PLANE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if DATA_PLANE_DIR not in sys.path:
     sys.path.insert(0, DATA_PLANE_DIR)
 
-import asyncpg
+import asyncpg  # noqa: E402
 
-from agent_runner.knowledge import KnowledgeCache
-from agent_runner.runner import AgentRunner
-from agents.dummy.agent import DummyAgent
-from agents.issue_triage.agent import IssueTriageAgent
-from agents.pr_context.agent import PRContextAgent
-from agents.meeting_summary.agent import MeetingSummaryAgent
-from agents.slack_digest.agent import SlackDigestAgent
-from agents.insights.agent import InsightsAgent
-from agents.trend_analysis.agent import TrendAnalysisAgent
+from agent_runner.knowledge import KnowledgeCache  # noqa: E402
+from agent_runner.runner import AgentRunner  # noqa: E402
+from agents.dummy.agent import DummyAgent  # noqa: E402
+from agents.insights.agent import InsightsAgent  # noqa: E402
+from agents.issue_triage.agent import IssueTriageAgent  # noqa: E402
+from agents.meeting_summary.agent import MeetingSummaryAgent  # noqa: E402
+from agents.pr_context.agent import PRContextAgent  # noqa: E402
+from agents.slack_digest.agent import SlackDigestAgent  # noqa: E402
+from agents.trend_analysis.agent import TrendAnalysisAgent  # noqa: E402
 
 
 def get_llm_client():
@@ -80,6 +80,7 @@ async def main():
 
     # Handle SIGTERM for graceful shutdown
     import signal
+
     loop = asyncio.get_event_loop()
     for sig in (signal.SIGTERM, signal.SIGINT):
         loop.add_signal_handler(sig, lambda: asyncio.create_task(runner.stop()))

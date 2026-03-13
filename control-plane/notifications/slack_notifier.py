@@ -6,11 +6,9 @@ summaries, priority badges, and links.
 """
 
 import json
-import os
-import urllib.request
 import urllib.error
+import urllib.request
 from dataclasses import dataclass
-
 
 PRIORITY_EMOJI = {
     "critical": ":red_circle:",
@@ -30,6 +28,7 @@ RISK_EMOJI = {
 @dataclass
 class NotificationConfig:
     """Configuration for which events notify which channels."""
+
     channel_id: str
     channel_name: str
     event_types: list[str]

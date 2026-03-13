@@ -53,9 +53,7 @@ class AgentRunner:
 
     async def _recover_stale_jobs(self) -> None:
         """Reset jobs stuck in 'running' status from a previous crash."""
-        rows = await self.pool.fetch(
-            "SELECT id FROM jobs WHERE status = 'running'"
-        )
+        rows = await self.pool.fetch("SELECT id FROM jobs WHERE status = 'running'")
         for row in rows:
             await self.pool.execute(
                 "UPDATE jobs SET status = 'pending', started_at = NULL WHERE id = $1",
@@ -85,8 +83,7 @@ class AgentRunner:
 
         # Create agent run record
         run_row = await self.pool.fetchrow(
-            "INSERT INTO agent_runs (job_id, agent_name, status) "
-            "VALUES ($1, $2, 'started') RETURNING id",
+            "INSERT INTO agent_runs (job_id, agent_name, status) VALUES ($1, $2, 'started') RETURNING id",
             job_id,
             agent_name,
         )
@@ -105,32 +102,24 @@ class AgentRunner:
             await self._update_run_status(run_id, "collecting_data")
             logger.info("Loading input")
             agent.load_input(agent_input)
-            await self._check_review_gate(
-                job_id, run_id, agent_name, "after_input", logger
-            )
+            await self._check_review_gate(job_id, run_id, agent_name, "after_input", logger)
 
             # Stage 2: Collect context
             logger.info("Collecting context")
             agent.collect_context()
-            await self._check_review_gate(
-                job_id, run_id, agent_name, "after_context", logger
-            )
+            await self._check_review_gate(job_id, run_id, agent_name, "after_context", logger)
 
             # Stage 3: Analyze
             await self._update_run_status(run_id, "analyzing")
             logger.info("Analyzing")
             agent.analyze()
-            await self._check_review_gate(
-                job_id, run_id, agent_name, "after_analysis", logger
-            )
+            await self._check_review_gate(job_id, run_id, agent_name, "after_analysis", logger)
 
             # Stage 4: Generate output
             await self._update_run_status(run_id, "generating_output")
             logger.info("Generating output")
             output = agent.generate_output()
-            await self._check_review_gate(
-                job_id, run_id, agent_name, "after_output", logger
-            )
+            await self._check_review_gate(job_id, run_id, agent_name, "after_output", logger)
 
             # Stage 5: Store artifacts
             await self._update_run_status(run_id, "storing_artifacts")
@@ -150,8 +139,7 @@ class AgentRunner:
             # Record artifacts in database
             for uri in uris:
                 await self.pool.execute(
-                    "INSERT INTO artifacts (run_id, artifact_type, storage_uri) "
-                    "VALUES ($1, $2, $3)",
+                    "INSERT INTO artifacts (run_id, artifact_type, storage_uri) VALUES ($1, $2, $3)",
                     run_id,
                     "agent_output",
                     uri,
@@ -172,9 +160,7 @@ class AgentRunner:
                 )
 
             # Complete run and job
-            await self._update_run_status(
-                run_id, "completed", git_commit=commit_hash
-            )
+            await self._update_run_status(run_id, "completed", git_commit=commit_hash)
             await self._update_job_status(job_id, "completed")
             logger.info(f"Job {job_id} completed successfully")
 
@@ -198,6 +184,7 @@ class AgentRunner:
             raise ValueError(f"Unknown agent: {agent_name}")
         # Build kwargs based on what the agent constructor accepts
         import inspect
+
         sig = inspect.signature(agent_cls.__init__)
         kwargs = {"knowledge_cache": self.cache, "logger": logger}
         if "llm_client" in sig.parameters:
@@ -206,9 +193,7 @@ class AgentRunner:
             kwargs["embedding_service"] = self.embedding_service
         return agent_cls(**kwargs)
 
-    async def _update_run_status(
-        self, run_id: int, status: str, git_commit: str | None = None
-    ) -> None:
+    async def _update_run_status(self, run_id: int, status: str, git_commit: str | None = None) -> None:
         if status in ("completed", "failed"):
             await self.pool.execute(
                 "UPDATE agent_runs SET status = $2::run_status, end_time = NOW(), "
@@ -227,8 +212,7 @@ class AgentRunner:
     async def _update_job_status(self, job_id: int, status: str) -> None:
         if status == "completed":
             await self.pool.execute(
-                "UPDATE jobs SET status = $2::job_status, completed_at = NOW() "
-                "WHERE id = $1",
+                "UPDATE jobs SET status = $2::job_status, completed_at = NOW() WHERE id = $1",
                 job_id,
                 status,
             )
@@ -248,8 +232,7 @@ class AgentRunner:
         logger: AgentLogger,
     ) -> None:
         gate = await self.pool.fetchrow(
-            "SELECT enabled FROM review_gates "
-            "WHERE agent_name = $1 AND stage = $2",
+            "SELECT enabled FROM review_gates WHERE agent_name = $1 AND stage = $2",
             agent_name,
             stage,
         )
@@ -276,10 +259,7 @@ class AgentRunner:
                     await self._update_job_status(job_id, "running")
                     return
                 else:
-                    raise ReviewRejectedException(
-                        f"Rejected at {stage}: "
-                        f"{decision['comments'] or 'No reason given'}"
-                    )
+                    raise ReviewRejectedException(f"Rejected at {stage}: {decision['comments'] or 'No reason given'}")
             await asyncio.sleep(self.REVIEW_POLL_INTERVAL)
 
     async def _publish_event(self, agent_name: str, job_id: int, output) -> None:
@@ -289,9 +269,7 @@ class AgentRunner:
             "pr-context": "pr.analyzed",
             "meeting-summary": "meeting.summarized",
         }
-        event_type = event_type_map.get(
-            agent_name, f"{agent_name}.completed"
-        )
+        event_type = event_type_map.get(agent_name, f"{agent_name}.completed")
         payload = {
             "job_id": job_id,
             "agent": agent_name,
@@ -301,14 +279,16 @@ class AgentRunner:
         # Include key data from the output
         if output.data:
             for key in (
-                "issue_number", "pr_number", "meeting_id",
-                "priority", "confidence",
+                "issue_number",
+                "pr_number",
+                "meeting_id",
+                "priority",
+                "confidence",
             ):
                 if key in output.data:
                     payload[key] = output.data[key]
         await self.pool.execute(
-            "INSERT INTO events (event_type, source, payload) "
-            "VALUES ($1, $2, $3::jsonb)",
+            "INSERT INTO events (event_type, source, payload) VALUES ($1, $2, $3::jsonb)",
             event_type,
             agent_name,
             json.dumps(payload),

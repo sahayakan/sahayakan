@@ -2,7 +2,7 @@
 
 import json
 import re
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 from agent_runner.contracts.base_agent import AgentInput, AgentOutput, BaseAgent
@@ -14,7 +14,13 @@ PROMPT_PATH = Path(__file__).parent.parent.parent / "prompts" / "slack_digest.pr
 
 
 class SlackDigestAgent(BaseAgent):
-    def __init__(self, knowledge_cache: KnowledgeCache, logger: AgentLogger, llm_client: LLMClient | None = None, embedding_service=None):
+    def __init__(
+        self,
+        knowledge_cache: KnowledgeCache,
+        logger: AgentLogger,
+        llm_client: LLMClient | None = None,
+        embedding_service=None,
+    ):
         self.cache = knowledge_cache
         self.log = logger
         self.llm = llm_client
@@ -67,7 +73,7 @@ class SlackDigestAgent(BaseAgent):
         text = self.messages_text.lower()
 
         # Find mentioned issues
-        issue_nums = set(int(m) for m in re.findall(r'#(\d+)', text))
+        issue_nums = set(int(m) for m in re.findall(r"#(\d+)", text))
         related_issues = []
         for num in issue_nums:
             if self.cache.file_exists(f"github/issues/{num}.json"):
@@ -75,7 +81,7 @@ class SlackDigestAgent(BaseAgent):
                 related_issues.append({"number": num, "title": issue.get("title", "")})
 
         # Find mentioned PRs
-        pr_nums = set(int(m) for m in re.findall(r'(?:pr|pull)\s*#?(\d+)', text))
+        pr_nums = set(int(m) for m in re.findall(r"(?:pr|pull)\s*#?(\d+)", text))
         related_prs = []
         for num in pr_nums:
             if self.cache.file_exists(f"github/pull_requests/{num}.json"):
@@ -83,14 +89,16 @@ class SlackDigestAgent(BaseAgent):
                 related_prs.append({"number": num, "title": pr.get("title", "")})
 
         # Find Jira tickets
-        jira_keys = set(re.findall(r'[A-Z]{2,}-\d+', self.messages_text))
+        jira_keys = set(re.findall(r"[A-Z]{2,}-\d+", self.messages_text))
         related_jira = []
         for key in jira_keys:
             if self.cache.file_exists(f"jira/tickets/{key}.json"):
                 ticket = self.cache.read_json(f"jira/tickets/{key}.json")
                 related_jira.append({"key": key, "summary": ticket.get("summary", "")})
 
-        self.log.info(f"Context: {len(related_issues)} issues, {len(related_prs)} PRs, {len(related_jira)} Jira tickets")
+        self.log.info(
+            f"Context: {len(related_issues)} issues, {len(related_prs)} PRs, {len(related_jira)} Jira tickets"
+        )
         self.context = {"related_issues": related_issues, "related_prs": related_prs, "related_jira": related_jira}
 
     def analyze(self) -> None:
@@ -98,39 +106,73 @@ class SlackDigestAgent(BaseAgent):
             raise RuntimeError("LLM client not configured")
 
         prompt_template = PROMPT_PATH.read_text()
-        date_str = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+        date_str = datetime.now(UTC).strftime("%Y-%m-%d")
         prompt = prompt_template.format(
             channel_name=self.channel_name,
             time_period=self.input.parameters.get("date", date_str),
             messages=self.messages_text[:12000],
-            related_issues=json.dumps(self.context["related_issues"], indent=2) if self.context["related_issues"] else "None found",
-            related_prs=json.dumps(self.context["related_prs"], indent=2) if self.context["related_prs"] else "None found",
-            jira_tickets=json.dumps(self.context["related_jira"], indent=2) if self.context["related_jira"] else "None found",
+            related_issues=json.dumps(self.context["related_issues"], indent=2)
+            if self.context["related_issues"]
+            else "None found",
+            related_prs=json.dumps(self.context["related_prs"], indent=2)
+            if self.context["related_prs"]
+            else "None found",
+            jira_tickets=json.dumps(self.context["related_jira"], indent=2)
+            if self.context["related_jira"]
+            else "None found",
         )
 
         self.log.info(f"Sending prompt to LLM ({len(prompt)} chars)")
         response = self.llm.generate(prompt)
-        self.log.llm(model=response.model, tokens=response.tokens_input + response.tokens_output, latency_ms=response.latency_ms)
-        self.llm_usage = {"model": response.model, "tokens_input": response.tokens_input, "tokens_output": response.tokens_output, "latency_ms": response.latency_ms}
+        self.log.llm(
+            model=response.model, tokens=response.tokens_input + response.tokens_output, latency_ms=response.latency_ms
+        )
+        self.llm_usage = {
+            "model": response.model,
+            "tokens_input": response.tokens_input,
+            "tokens_output": response.tokens_output,
+            "latency_ms": response.latency_ms,
+        }
 
         try:
             text = response.text.strip()
             if text.startswith("```"):
-                text = re.sub(r'^```\w*\n?', '', text)
-                text = re.sub(r'\n?```$', '', text)
+                text = re.sub(r"^```\w*\n?", "", text)
+                text = re.sub(r"\n?```$", "", text)
             self.analysis = json.loads(text)
         except json.JSONDecodeError as e:
             self.log.error(f"Failed to parse LLM response: {e}")
-            self.analysis = {"channel": self.channel_name, "summary": "Parse failure", "key_discussions": [], "decisions": [], "action_items": [], "mentioned_issues": [], "mentioned_prs": [], "mentioned_jira_tickets": [], "highlights": [], "confidence": 0.0}
+            self.analysis = {
+                "channel": self.channel_name,
+                "summary": "Parse failure",
+                "key_discussions": [],
+                "decisions": [],
+                "action_items": [],
+                "mentioned_issues": [],
+                "mentioned_prs": [],
+                "mentioned_jira_tickets": [],
+                "highlights": [],
+                "confidence": 0.0,
+            }
 
-        self.log.info(f"Analysis: {len(self.analysis.get('key_discussions', []))} discussions, {len(self.analysis.get('action_items', []))} action items")
+        self.log.info(
+            f"Analysis: {len(self.analysis.get('key_discussions', []))} discussions, {len(self.analysis.get('action_items', []))} action items"
+        )
 
     def generate_output(self) -> AgentOutput:
-        date_str = self.input.parameters.get("date", datetime.now(timezone.utc).strftime("%Y-%m-%d"))
+        date_str = self.input.parameters.get("date", datetime.now(UTC).strftime("%Y-%m-%d"))
         digest_id = f"{self.channel_name}_{date_str}"
-        output_data = {"digest_id": digest_id, "channel": self.channel_name, **self.analysis, "llm_usage": self.llm_usage, "generated_at": datetime.now(timezone.utc).isoformat()}
+        output_data = {
+            "digest_id": digest_id,
+            "channel": self.channel_name,
+            **self.analysis,
+            "llm_usage": self.llm_usage,
+            "generated_at": datetime.now(UTC).isoformat(),
+        }
         return AgentOutput(
-            status="success", summary=self.analysis.get("summary", f"Digest for #{self.channel_name}"), data=output_data,
+            status="success",
+            summary=self.analysis.get("summary", f"Digest for #{self.channel_name}"),
+            data=output_data,
             artifacts=[
                 {"type": "slack_digest_json", "path": f"agent_outputs/slack_digests/{digest_id}.json"},
                 {"type": "slack_digest_report", "path": f"agent_outputs/slack_digests/{digest_id}.md"},
@@ -152,10 +194,13 @@ class SlackDigestAgent(BaseAgent):
     def _generate_report(self, data: dict) -> str:
         lines = [
             f"# Slack Digest: #{data.get('channel', '')}",
-            "", f"**Generated by:** slack-digest agent",
+            "",
+            "**Generated by:** slack-digest agent",
             f"**Date:** {data.get('generated_at', 'N/A')}",
             f"**Confidence:** {data.get('confidence', 0)}",
-            "", "## Summary", data.get("summary", "N/A"),
+            "",
+            "## Summary",
+            data.get("summary", "N/A"),
         ]
         if data.get("key_discussions"):
             lines.extend(["", "## Key Discussions"])

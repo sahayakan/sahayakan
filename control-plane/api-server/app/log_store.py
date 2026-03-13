@@ -5,12 +5,11 @@ for real-time streaming.
 """
 
 import asyncio
-import json
+import contextlib
 import re
 from collections import defaultdict
-from dataclasses import dataclass, field
-from datetime import datetime, timezone
-
+from dataclasses import dataclass
+from datetime import UTC, datetime
 
 MAX_LINES_PER_JOB = 1000
 
@@ -38,9 +37,7 @@ _logs: dict[int, list[LogEntry]] = defaultdict(list)
 _subscribers: dict[int, list[asyncio.Queue]] = defaultdict(list)
 
 # Pattern to parse structured log lines from the runner
-_LOG_PATTERN = re.compile(
-    r"\[(\w+)\]\s+\[([^\]]+)\]\s+\[(\d+)\]\s+(.*)"
-)
+_LOG_PATTERN = re.compile(r"\[(\w+)\]\s+\[([^\]]+)\]\s+\[(\d+)\]\s+(.*)")
 
 
 def parse_log_line(line: str) -> LogEntry | None:
@@ -64,15 +61,13 @@ def add_log(job_id: int, entry: LogEntry) -> None:
 
     # Broadcast to subscribers
     for queue in _subscribers.get(job_id, []):
-        try:
+        with contextlib.suppress(asyncio.QueueFull):
             queue.put_nowait(entry)
-        except asyncio.QueueFull:
-            pass
 
 
 def add_log_line(job_id: int, level: str, message: str, stage: str = "") -> None:
     entry = LogEntry(
-        timestamp=datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S.%fZ"),
+        timestamp=datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%S.%fZ"),
         job_id=job_id,
         level=level,
         message=message,

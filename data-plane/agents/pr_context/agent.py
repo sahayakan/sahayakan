@@ -2,7 +2,7 @@
 
 import json
 import re
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 from agent_runner.contracts.base_agent import AgentInput, AgentOutput, BaseAgent
@@ -14,7 +14,13 @@ PROMPT_PATH = Path(__file__).parent.parent.parent / "prompts" / "pr_context.prom
 
 
 class PRContextAgent(BaseAgent):
-    def __init__(self, knowledge_cache: KnowledgeCache, logger: AgentLogger, llm_client: LLMClient | None = None, embedding_service=None):
+    def __init__(
+        self,
+        knowledge_cache: KnowledgeCache,
+        logger: AgentLogger,
+        llm_client: LLMClient | None = None,
+        embedding_service=None,
+    ):
         self.cache = knowledge_cache
         self.log = logger
         self.llm = llm_client
@@ -41,7 +47,7 @@ class PRContextAgent(BaseAgent):
         pr_title = (self.pr_data.get("title") or "").lower()
 
         # Find linked issues from PR body/title
-        issue_refs = set(int(m) for m in re.findall(r'#(\d+)', f"{pr_title} {pr_body}"))
+        issue_refs = set(int(m) for m in re.findall(r"#(\d+)", f"{pr_title} {pr_body}"))
         linked_issues = []
         for num in issue_refs:
             path = f"github/issues/{num}.json"
@@ -51,14 +57,16 @@ class PRContextAgent(BaseAgent):
         self.log.info(f"Found {len(linked_issues)} linked issues")
 
         # Find related Jira tickets
-        jira_pattern = re.compile(r'[A-Z]{2,}-\d+')
+        jira_pattern = re.compile(r"[A-Z]{2,}-\d+")
         jira_refs = set(jira_pattern.findall(f"{pr_title} {self.pr_data.get('body', '')}"))
         related_jira = []
         for key in jira_refs:
             path = f"jira/tickets/{key}.json"
             if self.cache.file_exists(path):
                 ticket = self.cache.read_json(path)
-                related_jira.append({"key": key, "summary": ticket.get("summary", ""), "status": ticket.get("status", "")})
+                related_jira.append(
+                    {"key": key, "summary": ticket.get("summary", ""), "status": ticket.get("status", "")}
+                )
         self.log.info(f"Found {len(related_jira)} related Jira tickets")
 
         # Find previous analyses for linked issues
@@ -67,10 +75,20 @@ class PRContextAgent(BaseAgent):
             path = f"agent_outputs/issue_analysis/{issue['number']}.json"
             if self.cache.file_exists(path):
                 analysis = self.cache.read_json(path)
-                related_analyses.append({"issue": issue["number"], "priority": analysis.get("priority", ""), "summary": analysis.get("summary", "")})
+                related_analyses.append(
+                    {
+                        "issue": issue["number"],
+                        "priority": analysis.get("priority", ""),
+                        "summary": analysis.get("summary", ""),
+                    }
+                )
         self.log.info(f"Found {len(related_analyses)} previous analyses")
 
-        self.context = {"linked_issues": linked_issues, "related_jira": related_jira, "related_analyses": related_analyses}
+        self.context = {
+            "linked_issues": linked_issues,
+            "related_jira": related_jira,
+            "related_analyses": related_analyses,
+        }
 
     def analyze(self) -> None:
         if not self.llm:
@@ -85,36 +103,72 @@ class PRContextAgent(BaseAgent):
             changed_files=self.pr_data.get("changed_files", "unknown"),
             additions=self.pr_data.get("additions", "unknown"),
             deletions=self.pr_data.get("deletions", "unknown"),
-            linked_issues=json.dumps(self.context["linked_issues"], indent=2) if self.context["linked_issues"] else "None found",
-            jira_tickets=json.dumps(self.context["related_jira"], indent=2) if self.context["related_jira"] else "None found",
-            related_analyses=json.dumps(self.context["related_analyses"], indent=2) if self.context["related_analyses"] else "None found",
+            linked_issues=json.dumps(self.context["linked_issues"], indent=2)
+            if self.context["linked_issues"]
+            else "None found",
+            jira_tickets=json.dumps(self.context["related_jira"], indent=2)
+            if self.context["related_jira"]
+            else "None found",
+            related_analyses=json.dumps(self.context["related_analyses"], indent=2)
+            if self.context["related_analyses"]
+            else "None found",
         )
         self.log.info(f"Sending prompt to LLM ({len(prompt)} chars)")
         response = self.llm.generate(prompt)
-        self.log.llm(model=response.model, tokens=response.tokens_input + response.tokens_output, latency_ms=response.latency_ms)
-        self.llm_usage = {"model": response.model, "tokens_input": response.tokens_input, "tokens_output": response.tokens_output, "latency_ms": response.latency_ms}
+        self.log.llm(
+            model=response.model, tokens=response.tokens_input + response.tokens_output, latency_ms=response.latency_ms
+        )
+        self.llm_usage = {
+            "model": response.model,
+            "tokens_input": response.tokens_input,
+            "tokens_output": response.tokens_output,
+            "latency_ms": response.latency_ms,
+        }
 
         try:
             text = response.text.strip()
             if text.startswith("```"):
-                text = re.sub(r'^```\w*\n?', '', text)
-                text = re.sub(r'\n?```$', '', text)
+                text = re.sub(r"^```\w*\n?", "", text)
+                text = re.sub(r"\n?```$", "", text)
             self.analysis = json.loads(text)
         except json.JSONDecodeError as e:
             self.log.error(f"Failed to parse LLM response: {e}")
-            self.analysis = {"summary": "Parse failure", "change_type": "unknown", "risk_level": "medium", "risk_reasoning": "Could not parse", "linked_issues": [], "linked_jira_tickets": [], "components_modified": [], "test_coverage_notes": "", "review_suggestions": ["Manual review required"], "breaking_changes": False, "confidence": 0.0}
+            self.analysis = {
+                "summary": "Parse failure",
+                "change_type": "unknown",
+                "risk_level": "medium",
+                "risk_reasoning": "Could not parse",
+                "linked_issues": [],
+                "linked_jira_tickets": [],
+                "components_modified": [],
+                "test_coverage_notes": "",
+                "review_suggestions": ["Manual review required"],
+                "breaking_changes": False,
+                "confidence": 0.0,
+            }
 
-        self.log.info(f"Analysis complete: risk={self.analysis.get('risk_level', '?')}, confidence={self.analysis.get('confidence', '?')}")
+        self.log.info(
+            f"Analysis complete: risk={self.analysis.get('risk_level', '?')}, confidence={self.analysis.get('confidence', '?')}"
+        )
 
     def generate_output(self) -> AgentOutput:
         pr_num = self.pr_data["number"]
         output_data = {
-            "pr_number": pr_num, "pr_title": self.pr_data.get("title", ""), "pr_url": self.pr_data.get("html_url", ""),
-            **self.analysis, "llm_usage": self.llm_usage, "generated_at": datetime.now(timezone.utc).isoformat(),
+            "pr_number": pr_num,
+            "pr_title": self.pr_data.get("title", ""),
+            "pr_url": self.pr_data.get("html_url", ""),
+            **self.analysis,
+            "llm_usage": self.llm_usage,
+            "generated_at": datetime.now(UTC).isoformat(),
         }
         return AgentOutput(
-            status="success", summary=self.analysis.get("summary", f"PR #{pr_num} analysis complete"), data=output_data,
-            artifacts=[{"type": "pr_context_json", "path": f"agent_outputs/pr_context/{pr_num}.json"}, {"type": "pr_context_report", "path": f"agent_outputs/pr_context/{pr_num}.md"}],
+            status="success",
+            summary=self.analysis.get("summary", f"PR #{pr_num} analysis complete"),
+            data=output_data,
+            artifacts=[
+                {"type": "pr_context_json", "path": f"agent_outputs/pr_context/{pr_num}.json"},
+                {"type": "pr_context_report", "path": f"agent_outputs/pr_context/{pr_num}.md"},
+            ],
         )
 
     def store_artifacts(self, output: AgentOutput) -> list[str]:
@@ -133,10 +187,18 @@ class PRContextAgent(BaseAgent):
         pr_num = data["pr_number"]
         lines = [
             f"# PR Analysis: #{pr_num} - {data.get('pr_title', '')}",
-            "", f"**Generated by:** pr-context agent", f"**Date:** {data.get('generated_at', 'N/A')}", f"**Confidence:** {data.get('confidence', 0)}",
-            "", "## Summary", data.get("summary", "N/A"),
-            "", f"## Change Type: {data.get('change_type', 'unknown').upper()}",
-            "", f"## Risk Level: {data.get('risk_level', 'unknown').upper()}", data.get("risk_reasoning", ""),
+            "",
+            "**Generated by:** pr-context agent",
+            f"**Date:** {data.get('generated_at', 'N/A')}",
+            f"**Confidence:** {data.get('confidence', 0)}",
+            "",
+            "## Summary",
+            data.get("summary", "N/A"),
+            "",
+            f"## Change Type: {data.get('change_type', 'unknown').upper()}",
+            "",
+            f"## Risk Level: {data.get('risk_level', 'unknown').upper()}",
+            data.get("risk_reasoning", ""),
         ]
         if data.get("linked_issues"):
             lines.extend(["", "## Linked Issues"] + [f"- #{i}" for i in data["linked_issues"]])
@@ -147,6 +209,17 @@ class PRContextAgent(BaseAgent):
         if data.get("test_coverage_notes"):
             lines.extend(["", "## Test Coverage", data["test_coverage_notes"]])
         if data.get("review_suggestions"):
-            lines.extend(["", "## Review Suggestions"] + [f"{i}. {s}" for i, s in enumerate(data["review_suggestions"], 1)])
-        lines.extend(["", f"**Breaking Changes:** {'Yes' if data.get('breaking_changes') else 'No'}", "", "---", f"*Job ID: {self.input.job_id if self.input else 'N/A'}*", ""])
+            lines.extend(
+                ["", "## Review Suggestions"] + [f"{i}. {s}" for i, s in enumerate(data["review_suggestions"], 1)]
+            )
+        lines.extend(
+            [
+                "",
+                f"**Breaking Changes:** {'Yes' if data.get('breaking_changes') else 'No'}",
+                "",
+                "---",
+                f"*Job ID: {self.input.job_id if self.input else 'N/A'}*",
+                "",
+            ]
+        )
         return "\n".join(lines)

@@ -10,13 +10,8 @@ async def find_similar_issues(
     limit: int = 5,
 ) -> list[dict]:
     """Find issues semantically similar to the query text."""
-    results = await embedding_service.search(
-        query_text, source_types=["issue"], limit=limit + 1
-    )
-    return [
-        r for r in results
-        if r["source_id"] != exclude_id and r["similarity"] > 0.3
-    ][:limit]
+    results = await embedding_service.search(query_text, source_types=["issue"], limit=limit + 1)
+    return [r for r in results if r["source_id"] != exclude_id and r["similarity"] > 0.3][:limit]
 
 
 async def find_related_prs(
@@ -25,9 +20,7 @@ async def find_related_prs(
     limit: int = 5,
 ) -> list[dict]:
     """Find PRs semantically related to the query text."""
-    results = await embedding_service.search(
-        query_text, source_types=["pr"], limit=limit
-    )
+    results = await embedding_service.search(query_text, source_types=["pr"], limit=limit)
     return [r for r in results if r["similarity"] > 0.3]
 
 
@@ -37,9 +30,7 @@ async def find_related_jira(
     limit: int = 5,
 ) -> list[dict]:
     """Find Jira tickets semantically related to the query text."""
-    results = await embedding_service.search(
-        query_text, source_types=["jira"], limit=limit
-    )
+    results = await embedding_service.search(query_text, source_types=["jira"], limit=limit)
     return [r for r in results if r["similarity"] > 0.3]
 
 
@@ -49,7 +40,5 @@ async def find_related_reports(
     limit: int = 5,
 ) -> list[dict]:
     """Find previous agent reports semantically related to the query text."""
-    results = await embedding_service.search(
-        query_text, source_types=["report"], limit=limit
-    )
+    results = await embedding_service.search(query_text, source_types=["report"], limit=limit)
     return [r for r in results if r["similarity"] > 0.3]

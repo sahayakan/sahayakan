@@ -8,45 +8,58 @@ sys.path.insert(0, "data-plane")
 sys.path.insert(0, "control-plane")
 
 import asyncpg
+from event_bus.processor import EventBusProcessor
+from notifications.slack_notifier import NotificationConfig, SlackNotifier
 
 from agent_runner.knowledge import KnowledgeCache
 from agent_runner.runner import AgentRunner
 from agents.dummy.agent import DummyAgent
 from agents.issue_triage.agent import IssueTriageAgent
-from agents.pr_context.agent import PRContextAgent
 from agents.meeting_summary.agent import MeetingSummaryAgent
+from agents.pr_context.agent import PRContextAgent
 from agents.slack_digest.agent import SlackDigestAgent
-from event_bus.processor import EventBusProcessor
 from llm_client.gemini_client import MockLLMClient
-from notifications.slack_notifier import SlackNotifier, NotificationConfig
 
-
-DIGEST_MOCK = json.dumps({
-    "channel": "engineering",
-    "time_period": "2026-03-13",
-    "summary": "Team discussed deployment pipeline issues and upcoming release timeline",
-    "key_discussions": [
-        {"topic": "CI/CD Pipeline", "participants": ["alice", "bob"], "summary": "Pipeline failing on arm64 builds"},
-        {"topic": "Release Planning", "participants": ["carol", "dave"], "summary": "v2.1 release pushed to next week"},
-    ],
-    "decisions": ["Fix arm64 builds before release", "Postpone v2.1 to March 20"],
-    "action_items": [
-        {"assignee": "bob", "action": "Debug arm64 build failures", "related_issue": None, "related_jira": None},
-        {"assignee": "carol", "action": "Update release notes", "related_issue": None, "related_jira": None},
-    ],
-    "mentioned_issues": [],
-    "mentioned_prs": [],
-    "mentioned_jira_tickets": [],
-    "highlights": ["Pipeline outage resolved at 2pm"],
-    "confidence": 0.79,
-})
+DIGEST_MOCK = json.dumps(
+    {
+        "channel": "engineering",
+        "time_period": "2026-03-13",
+        "summary": "Team discussed deployment pipeline issues and upcoming release timeline",
+        "key_discussions": [
+            {
+                "topic": "CI/CD Pipeline",
+                "participants": ["alice", "bob"],
+                "summary": "Pipeline failing on arm64 builds",
+            },
+            {
+                "topic": "Release Planning",
+                "participants": ["carol", "dave"],
+                "summary": "v2.1 release pushed to next week",
+            },
+        ],
+        "decisions": ["Fix arm64 builds before release", "Postpone v2.1 to March 20"],
+        "action_items": [
+            {"assignee": "bob", "action": "Debug arm64 build failures", "related_issue": None, "related_jira": None},
+            {"assignee": "carol", "action": "Update release notes", "related_issue": None, "related_jira": None},
+        ],
+        "mentioned_issues": [],
+        "mentioned_prs": [],
+        "mentioned_jira_tickets": [],
+        "highlights": ["Pipeline outage resolved at 2pm"],
+        "confidence": 0.79,
+    }
+)
 
 
 async def main():
     pool = await asyncpg.create_pool(
-        user="sahayakan", password="sahayakan_dev_password",
-        database="sahayakan", host="localhost", port=5433,
-        min_size=1, max_size=5,
+        user="sahayakan",
+        password="sahayakan_dev_password",
+        database="sahayakan",
+        host="localhost",
+        port=5433,
+        min_size=1,
+        max_size=5,
     )
     cache = KnowledgeCache("knowledge-cache")
 
@@ -65,12 +78,36 @@ async def main():
         "channel": "engineering",
         "channel_id": "C12345",
         "messages": [
-            {"user": "alice", "text": "Good morning team! CI pipeline is failing again on arm64", "ts": "1710320400", "type": "message", "thread_replies": [
-                {"user": "bob", "text": "I'll look into it right away", "ts": "1710320460"},
-            ]},
-            {"user": "carol", "text": "Should we postpone the v2.1 release?", "ts": "1710321000", "type": "message", "thread_replies": []},
-            {"user": "dave", "text": "Yes, let's push to next week. I'll update the roadmap.", "ts": "1710321060", "type": "message", "thread_replies": []},
-            {"user": "bob", "text": "Pipeline outage resolved. Root cause was a docker image update.", "ts": "1710328800", "type": "message", "thread_replies": []},
+            {
+                "user": "alice",
+                "text": "Good morning team! CI pipeline is failing again on arm64",
+                "ts": "1710320400",
+                "type": "message",
+                "thread_replies": [
+                    {"user": "bob", "text": "I'll look into it right away", "ts": "1710320460"},
+                ],
+            },
+            {
+                "user": "carol",
+                "text": "Should we postpone the v2.1 release?",
+                "ts": "1710321000",
+                "type": "message",
+                "thread_replies": [],
+            },
+            {
+                "user": "dave",
+                "text": "Yes, let's push to next week. I'll update the roadmap.",
+                "ts": "1710321060",
+                "type": "message",
+                "thread_replies": [],
+            },
+            {
+                "user": "bob",
+                "text": "Pipeline outage resolved. Root cause was a docker image update.",
+                "ts": "1710328800",
+                "type": "message",
+                "thread_replies": [],
+            },
         ],
         "message_count": 4,
         "fetched_at": "2026-03-13T14:00:00Z",
@@ -86,8 +123,7 @@ async def main():
 
     params = json.dumps({"channel": "engineering", "date": "2026-03-13"})
     row = await pool.fetchrow(
-        "INSERT INTO jobs (agent_name, status, parameters) "
-        "VALUES ('slack-digest', 'pending', $1::jsonb) RETURNING id",
+        "INSERT INTO jobs (agent_name, status, parameters) VALUES ('slack-digest', 'pending', $1::jsonb) RETURNING id",
         params,
     )
     job_id = row["id"]
@@ -95,10 +131,13 @@ async def main():
 
     llm = MockLLMClient(DIGEST_MOCK)
     runner = AgentRunner(
-        db_pool=pool, knowledge_cache=cache,
+        db_pool=pool,
+        knowledge_cache=cache,
         agent_registry={
-            "dummy": DummyAgent, "issue-triage": IssueTriageAgent,
-            "pr-context": PRContextAgent, "meeting-summary": MeetingSummaryAgent,
+            "dummy": DummyAgent,
+            "issue-triage": IssueTriageAgent,
+            "pr-context": PRContextAgent,
+            "meeting-summary": MeetingSummaryAgent,
             "slack-digest": SlackDigestAgent,
         },
         llm_client=llm,
@@ -150,25 +189,20 @@ async def main():
     event_bus = EventBusProcessor(db_pool=pool)
     await event_bus._register_default_subscriptions()
 
-    subs = await pool.fetch(
-        "SELECT agent_name, event_type FROM agent_subscriptions "
-        "WHERE agent_name = 'slack-digest'"
-    )
+    subs = await pool.fetch("SELECT agent_name, event_type FROM agent_subscriptions WHERE agent_name = 'slack-digest'")
     print(f"Slack digest subscriptions: {len(subs)}")
     for s in subs:
         print(f"  {s['agent_name']} -> {s['event_type']}")
 
     # Publish slack.synced event
     await pool.execute(
-        "INSERT INTO events (event_type, source, payload) "
-        "VALUES ('slack.synced', 'test', $1::jsonb)",
+        "INSERT INTO events (event_type, source, payload) VALUES ('slack.synced', 'test', $1::jsonb)",
         json.dumps({"channel": "engineering", "messages": 4}),
     )
     await event_bus._process_events()
 
     pending = await pool.fetch(
-        "SELECT id, agent_name, parameters FROM jobs "
-        "WHERE agent_name = 'slack-digest' AND status = 'pending'"
+        "SELECT id, agent_name, parameters FROM jobs WHERE agent_name = 'slack-digest' AND status = 'pending'"
     )
     print(f"Jobs created by event bus: {len(pending)}")
 
@@ -180,8 +214,7 @@ async def main():
 
     # Check all events
     events = await pool.fetch(
-        "SELECT event_type, source FROM events "
-        "WHERE event_type LIKE 'slack%' ORDER BY created_at"
+        "SELECT event_type, source FROM events WHERE event_type LIKE 'slack%' ORDER BY created_at"
     )
     print(f"Slack events: {len(events)}")
     for e in events:
@@ -189,11 +222,14 @@ async def main():
 
     # Git log
     import subprocess
+
     result = subprocess.run(
         ["git", "log", "--oneline", "-3"],
-        cwd="knowledge-cache", capture_output=True, text=True,
+        cwd="knowledge-cache",
+        capture_output=True,
+        text=True,
     )
-    print(f"\nKnowledge cache git log:")
+    print("\nKnowledge cache git log:")
     print(result.stdout)
 
     await pool.close()
