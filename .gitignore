@@ -33,6 +33,10 @@ web-ui/dist/
 postgres_data/
 minio_data/
 
+# Knowledge cache (generated agent outputs)
+knowledge-cache/agent_outputs/
+knowledge-cache/slack/
+
 # Test
 .pytest_cache/
 .coverage
