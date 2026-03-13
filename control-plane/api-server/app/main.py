@@ -16,6 +16,7 @@ from app.routes import (
     jobs,
     knowledge,
     logs,
+    repositories,
     reviews,
     schedules,
     search,
@@ -97,6 +98,7 @@ app.include_router(insights.router)
 app.include_router(schedules.router)
 app.include_router(search.router)
 app.include_router(usage.router)
+app.include_router(repositories.router)
 app.include_router(webhooks.router)
 app.include_router(websocket.router)
 

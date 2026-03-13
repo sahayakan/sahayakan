@@ -11,6 +11,7 @@ import DescriptionIcon from '@mui/icons-material/Description';
 import TimelineIcon from '@mui/icons-material/Timeline';
 import SearchIcon from '@mui/icons-material/Search';
 import LightbulbIcon from '@mui/icons-material/Lightbulb';
+import SettingsIcon from '@mui/icons-material/Settings';
 import MenuIcon from '@mui/icons-material/Menu';
 
 const DRAWER_WIDTH = 220;
@@ -23,6 +24,7 @@ const NAV_ITEMS = [
   { label: 'Insights', path: '/insights', icon: <LightbulbIcon /> },
   { label: 'Search', path: '/search', icon: <SearchIcon /> },
   { label: 'Events', path: '/events', icon: <TimelineIcon /> },
+  { label: 'Settings', path: '/settings', icon: <SettingsIcon /> },
 ];
 
 export default function MainLayout() {

@@ -9,6 +9,7 @@ import ReportsPage from './pages/ReportsPage';
 import EventsPage from './pages/EventsPage';
 import SearchPage from './pages/SearchPage';
 import InsightsPage from './pages/InsightsPage';
+import SettingsPage from './pages/SettingsPage';
 
 export default function App() {
   return (
@@ -26,6 +27,7 @@ export default function App() {
             <Route path="/events" element={<EventsPage />} />
             <Route path="/search" element={<SearchPage />} />
             <Route path="/insights" element={<InsightsPage />} />
+            <Route path="/settings" element={<SettingsPage />} />
           </Route>
         </Routes>
       </BrowserRouter>
