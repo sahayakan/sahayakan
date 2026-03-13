@@ -41,16 +41,14 @@ jobs:
           # Fetch latest changes
           git fetch origin main
 
-          # Check if there are new changes
-          if [ "$(git rev-parse HEAD)" = "$(git rev-parse origin/main)" ]; then
-            echo "Already up to date. Nothing to deploy."
-            exit 0
-          fi
-
-          # Update to latest
+          # Update to latest (always rebuild to catch Dockerfile/config changes)
           git reset --hard origin/main
           NEW_SHA=$(git rev-parse HEAD)
-          echo "Deploying commit: $NEW_SHA"
+          if [ "$PREV_SHA" = "$NEW_SHA" ]; then
+            echo "Code unchanged ($NEW_SHA) — rebuilding containers to catch config changes"
+          else
+            echo "Deploying new commit: $NEW_SHA (was $PREV_SHA)"
+          fi
 
           # Function to rollback on failure
           rollback() {
