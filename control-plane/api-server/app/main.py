@@ -55,6 +55,9 @@ class AuthMiddleware(BaseHTTPMiddleware):
             return await call_next(request)
 
         auth_header = request.headers.get("authorization", "")
+        # Allow requests with basic auth through (already authenticated by reverse proxy)
+        if auth_header.startswith("Basic "):
+            return await call_next(request)
         if not auth_header.startswith("Bearer "):
             return JSONResponse(status_code=401, content={"detail": "API key required"})
 
