@@ -1,0 +1,13 @@
+# Ingested data is managed by the knowledge cache's own git repo
+# Don't commit bulk data to the main sahayakan repo
+github/issues/*.json
+github/pull_requests/*.json
+jira/tickets/*.json
+meetings/transcripts/*.txt
+meetings/transcripts/*.json
+
+# Agent outputs (test data)
+agent_outputs/dummy/
+
+# Keep the directory structure
+!.gitkeep

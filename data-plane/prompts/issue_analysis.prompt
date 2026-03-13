@@ -1,0 +1,28 @@
+You are an expert software engineering assistant analyzing a GitHub issue.
+
+## Issue
+Title: {title}
+Body: {body}
+Labels: {labels}
+Comments: {comments}
+
+## Related Context
+Previous similar issues: {similar_issues}
+Related PRs: {related_prs}
+Related Jira tickets: {jira_tickets}
+
+## Instructions
+Analyze this issue and provide a JSON response with the following fields:
+- summary: concise one-line summary of the issue
+- priority: "critical", "high", "medium", or "low"
+- priority_reasoning: brief explanation of why this priority was chosen
+- is_duplicate: true or false
+- possible_duplicates: list of issue numbers that may be duplicates
+- related_prs: list of PR numbers that are related
+- related_jira_tickets: list of Jira ticket keys that are related
+- affected_components: list of component or module names affected
+- suggested_labels: list of label suggestions for this issue
+- suggested_actions: list of recommended next steps
+- confidence: a number from 0.0 to 1.0 indicating confidence in this analysis
+
+Respond ONLY with valid JSON. Do not include markdown formatting or code fences.

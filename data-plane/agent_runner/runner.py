@@ -20,10 +20,12 @@ class AgentRunner:
         db_pool: asyncpg.Pool,
         knowledge_cache: KnowledgeCache,
         agent_registry: dict[str, type],
+        llm_client=None,
     ):
         self.pool = db_pool
         self.cache = knowledge_cache
         self.agent_registry = agent_registry
+        self.llm_client = llm_client
         self.running = False
 
     async def start(self) -> None:
@@ -133,6 +135,20 @@ class AgentRunner:
                     uri,
                 )
 
+            # Record LLM usage if available
+            llm_usage = output.data.get("llm_usage") if output.data else None
+            if llm_usage:
+                await self.pool.execute(
+                    "INSERT INTO llm_usage "
+                    "(run_id, model, tokens_input, tokens_output, latency_ms) "
+                    "VALUES ($1, $2, $3, $4, $5)",
+                    run_id,
+                    llm_usage.get("model", "unknown"),
+                    llm_usage.get("tokens_input", 0),
+                    llm_usage.get("tokens_output", 0),
+                    llm_usage.get("latency_ms", 0),
+                )
+
             # Complete run and job
             await self._update_run_status(
                 run_id, "completed", git_commit=commit_hash
@@ -158,6 +174,15 @@ class AgentRunner:
         agent_cls = self.agent_registry.get(agent_name)
         if not agent_cls:
             raise ValueError(f"Unknown agent: {agent_name}")
+        # Pass llm_client if the agent constructor accepts it
+        import inspect
+        sig = inspect.signature(agent_cls.__init__)
+        if "llm_client" in sig.parameters:
+            return agent_cls(
+                knowledge_cache=self.cache,
+                logger=logger,
+                llm_client=self.llm_client,
+            )
         return agent_cls(knowledge_cache=self.cache, logger=logger)
 
     async def _update_run_status(
@@ -237,13 +262,29 @@ class AgentRunner:
             await asyncio.sleep(self.REVIEW_POLL_INTERVAL)
 
     async def _publish_event(self, agent_name: str, job_id: int, output) -> None:
-        event_type = f"{agent_name}.completed"
+        # Map agent names to semantic event types
+        event_type_map = {
+            "issue-triage": "issue.analyzed",
+            "pr-context": "pr.analyzed",
+            "meeting-summary": "meeting.summarized",
+        }
+        event_type = event_type_map.get(
+            agent_name, f"{agent_name}.completed"
+        )
         payload = {
             "job_id": job_id,
             "agent": agent_name,
             "status": output.status,
             "summary": output.summary,
         }
+        # Include key data from the output
+        if output.data:
+            for key in (
+                "issue_number", "pr_number", "meeting_id",
+                "priority", "confidence",
+            ):
+                if key in output.data:
+                    payload[key] = output.data[key]
         await self.pool.execute(
             "INSERT INTO events (event_type, source, payload) "
             "VALUES ($1, $2, $3::jsonb)",

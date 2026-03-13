@@ -52,7 +52,7 @@ services:
       API_HOST: "0.0.0.0"
       API_PORT: "8000"
     volumes:
-      - knowledge_cache:/data/knowledge-cache
+      - ../knowledge-cache:/data/knowledge-cache
     depends_on:
       postgres:
         condition: service_healthy
@@ -62,4 +62,3 @@ services:
 volumes:
   postgres_data:
   minio_data:
-  knowledge_cache:
