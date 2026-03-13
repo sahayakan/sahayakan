@@ -2,8 +2,10 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import PlainTextResponse
+from fastapi.responses import JSONResponse, PlainTextResponse
+from starlette.middleware.base import BaseHTTPMiddleware
 
+from app.auth import AUTH_ENABLED, PUBLIC_ROUTES, hash_api_key
 from app.database import close_db, init_db
 from app.routes import (
     agents,
@@ -37,6 +39,42 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
+class AuthMiddleware(BaseHTTPMiddleware):
+    """Enforce API key auth on all non-public routes when AUTH_ENABLED=true."""
+
+    async def dispatch(self, request, call_next):
+        if not AUTH_ENABLED:
+            return await call_next(request)
+
+        if request.url.path in PUBLIC_ROUTES:
+            return await call_next(request)
+
+        # Allow WebSocket upgrade without middleware interception
+        if request.url.path.startswith("/ws"):
+            return await call_next(request)
+
+        auth_header = request.headers.get("authorization", "")
+        if not auth_header.startswith("Bearer "):
+            return JSONResponse(status_code=401, content={"detail": "API key required"})
+
+        token = auth_header[7:]
+        key_hash = hash_api_key(token)
+
+        from app.database import pool
+
+        if not pool:
+            return await call_next(request)
+
+        row = await pool.fetchrow(
+            "SELECT id, enabled FROM api_keys WHERE key_hash = $1", key_hash
+        )
+        if not row or not row["enabled"]:
+            return JSONResponse(status_code=401, content={"detail": "Invalid API key"})
+
+        return await call_next(request)
+
+
+app.add_middleware(AuthMiddleware)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
