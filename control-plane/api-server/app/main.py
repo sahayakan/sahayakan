@@ -13,6 +13,7 @@ from app.routes import (
     events,
     ingestion,
     insights,
+    jira_projects,
     jobs,
     knowledge,
     logs,
@@ -99,6 +100,7 @@ app.include_router(schedules.router)
 app.include_router(search.router)
 app.include_router(usage.router)
 app.include_router(repositories.router)
+app.include_router(jira_projects.router)
 app.include_router(webhooks.router)
 app.include_router(websocket.router)
 
