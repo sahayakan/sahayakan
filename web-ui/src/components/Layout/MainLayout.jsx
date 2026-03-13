@@ -8,6 +8,7 @@ import DashboardIcon from '@mui/icons-material/Dashboard';
 import WorkIcon from '@mui/icons-material/Work';
 import SmartToyIcon from '@mui/icons-material/SmartToy';
 import DescriptionIcon from '@mui/icons-material/Description';
+import TimelineIcon from '@mui/icons-material/Timeline';
 import MenuIcon from '@mui/icons-material/Menu';
 
 const DRAWER_WIDTH = 220;
@@ -17,6 +18,7 @@ const NAV_ITEMS = [
   { label: 'Jobs', path: '/jobs', icon: <WorkIcon /> },
   { label: 'Agents', path: '/agents', icon: <SmartToyIcon /> },
   { label: 'Reports', path: '/reports', icon: <DescriptionIcon /> },
+  { label: 'Events', path: '/events', icon: <TimelineIcon /> },
 ];
 
 export default function MainLayout() {

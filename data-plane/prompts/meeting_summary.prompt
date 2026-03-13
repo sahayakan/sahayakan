@@ -1,0 +1,24 @@
+You are an expert at summarizing engineering meetings.
+
+## Transcript
+{transcript}
+
+## Related Context
+Issues mentioned: {related_issues}
+PRs mentioned: {related_prs}
+Jira tickets mentioned: {jira_tickets}
+
+## Instructions
+Analyze this meeting transcript and provide a JSON response with the following fields:
+- title: meeting title
+- attendees: list of attendee names
+- summary: 2-3 sentence overview of the meeting
+- action_items: list of objects with fields: assignee, action, related_issue (number or null), related_jira (ticket key or null), due (date string or null)
+- decisions: list of decisions made during the meeting
+- mentioned_issues: list of GitHub issue numbers mentioned
+- mentioned_prs: list of PR numbers mentioned
+- mentioned_jira_tickets: list of Jira ticket keys mentioned
+- key_topics: list of main topics discussed
+- confidence: 0.0 to 1.0
+
+Respond ONLY with valid JSON. Do not include markdown formatting or code fences.

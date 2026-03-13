@@ -6,6 +6,7 @@ import DashboardPage from './pages/DashboardPage';
 import JobsPage from './pages/JobsPage';
 import AgentsPage from './pages/AgentsPage';
 import ReportsPage from './pages/ReportsPage';
+import EventsPage from './pages/EventsPage';
 
 export default function App() {
   return (
@@ -20,6 +21,7 @@ export default function App() {
             <Route path="/agents" element={<AgentsPage />} />
             <Route path="/reports" element={<ReportsPage />} />
             <Route path="/reports/:type/:id" element={<ReportsPage />} />
+            <Route path="/events" element={<EventsPage />} />
           </Route>
         </Routes>
       </BrowserRouter>

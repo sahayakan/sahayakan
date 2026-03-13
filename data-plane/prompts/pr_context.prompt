@@ -1,0 +1,36 @@
+You are an expert code reviewer analyzing a pull request.
+
+## Pull Request
+Title: {title}
+Description: {body}
+State: {state}
+Base branch: {base_branch}
+Head branch: {head_branch}
+Changed files count: {changed_files}
+Additions: {additions}
+Deletions: {deletions}
+
+## Linked Issues
+{linked_issues}
+
+## Related Jira Tickets
+{jira_tickets}
+
+## Previous Related Analyses
+{related_analyses}
+
+## Instructions
+Analyze this PR and provide a JSON response with the following fields:
+- summary: concise description of the change
+- change_type: "feature", "bugfix", "refactor", "docs", "test", or "chore"
+- risk_level: "low", "medium", "high", or "critical"
+- risk_reasoning: brief explanation of the risk assessment
+- linked_issues: list of issue numbers referenced
+- linked_jira_tickets: list of Jira ticket keys referenced
+- components_modified: list of component or module names affected
+- test_coverage_notes: assessment of test coverage
+- review_suggestions: list of things a reviewer should check
+- breaking_changes: true or false
+- confidence: 0.0 to 1.0
+
+Respond ONLY with valid JSON. Do not include markdown formatting or code fences.

@@ -15,6 +15,8 @@ from agent_runner.knowledge import KnowledgeCache
 from agent_runner.runner import AgentRunner
 from agents.dummy.agent import DummyAgent
 from agents.issue_triage.agent import IssueTriageAgent
+from agents.pr_context.agent import PRContextAgent
+from agents.meeting_summary.agent import MeetingSummaryAgent
 
 
 def get_llm_client():
@@ -40,6 +42,8 @@ def get_agent_registry() -> dict:
     return {
         "dummy": DummyAgent,
         "issue-triage": IssueTriageAgent,
+        "pr-context": PRContextAgent,
+        "meeting-summary": MeetingSummaryAgent,
     }
 
 

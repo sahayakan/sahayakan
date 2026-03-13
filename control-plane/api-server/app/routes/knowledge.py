@@ -3,9 +3,10 @@
 import json
 from pathlib import Path
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, UploadFile, File, Form
 
 from app.config import settings
+from app.database import get_pool
 
 router = APIRouter(prefix="/knowledge", tags=["knowledge"])
 
@@ -131,3 +132,44 @@ async def get_report(report_type: str, report_id: str):
     result["type"] = report_type
     result["id"] = report_id
     return result
+
+
+@router.get("/meetings/transcripts")
+async def list_transcripts():
+    transcripts_dir = _cache_path() / "meetings" / "transcripts"
+    if not transcripts_dir.exists():
+        return {"transcripts": []}
+    results = []
+    for f in sorted(transcripts_dir.iterdir()):
+        if f.is_file() and f.name != ".gitkeep":
+            results.append({"id": f.stem, "filename": f.name, "size": f.stat().st_size})
+    return {"transcripts": results}
+
+
+@router.post("/meetings/transcripts", status_code=201)
+async def upload_transcript(
+    transcript_id: str = Form(...),
+    file: UploadFile = File(...),
+):
+    transcripts_dir = _cache_path() / "meetings" / "transcripts"
+    transcripts_dir.mkdir(parents=True, exist_ok=True)
+
+    content = await file.read()
+    text = content.decode("utf-8")
+
+    ext = Path(file.filename).suffix if file.filename else ".txt"
+    filepath = transcripts_dir / f"{transcript_id}{ext}"
+    filepath.write_text(text)
+
+    # Publish meeting.uploaded event
+    try:
+        pool = await get_pool()
+        await pool.execute(
+            "INSERT INTO events (event_type, source, payload) "
+            "VALUES ('meeting.uploaded', 'api', $1::jsonb)",
+            json.dumps({"transcript_id": transcript_id}),
+        )
+    except Exception:
+        pass  # Event publishing is best-effort
+
+    return {"transcript_id": transcript_id, "filename": filepath.name, "size": len(text)}
