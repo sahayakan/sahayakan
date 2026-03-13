@@ -39,6 +39,7 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
+
 class AuthMiddleware(BaseHTTPMiddleware):
     """Enforce API key auth on all non-public routes when AUTH_ENABLED=true."""
 
@@ -65,9 +66,7 @@ class AuthMiddleware(BaseHTTPMiddleware):
         if not pool:
             return await call_next(request)
 
-        row = await pool.fetchrow(
-            "SELECT id, enabled FROM api_keys WHERE key_hash = $1", key_hash
-        )
+        row = await pool.fetchrow("SELECT id, enabled FROM api_keys WHERE key_hash = $1", key_hash)
         if not row or not row["enabled"]:
             return JSONResponse(status_code=401, content={"detail": "Invalid API key"})
 
