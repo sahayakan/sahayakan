@@ -358,7 +358,12 @@ A 100GB EBS volume (`vol-0d5c096c225e7d210`) is attached as `/dev/xvdf` and moun
 | Path | Contents |
 |---|---|
 | `/data/docker` | Docker data-root (images, containers, volumes) |
+| `/data/docker/volumes/infrastructure_postgres_data/_data` | PostgreSQL database files |
+| `/data/docker/volumes/infrastructure_minio_data/_data` | MinIO object storage |
+| `/data/docker/volumes/infrastructure_knowledge_cache/_data` | Knowledge cache |
 | `/data/backups` | Daily database backups (symlinked from `/home/admin/backups`) |
+
+All persistent data (database, object storage, backups) resides on the EBS volume.
 
 The root disk (8GB) holds only the OS, packages, and repo checkout. The fstab entry uses
 `LABEL=sahayakan-data` with `nofail` so the server boots even if the volume is detached.
