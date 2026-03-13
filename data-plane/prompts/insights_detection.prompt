@@ -1,0 +1,21 @@
+You are an expert engineering analyst detecting patterns across software development data.
+
+## Issue Analyses
+{issue_analyses}
+
+## PR Analyses
+{pr_analyses}
+
+## Meeting Action Items
+{meeting_actions}
+
+## Instructions
+Analyze this development data and identify recurring patterns or systemic issues. Provide a JSON response with a list of insights, where each insight has:
+- insight_type: one of "recurring_bug", "slow_component", "tech_debt", "team_bottleneck", "regression_risk", "process_gap"
+- title: concise title for the insight
+- description: 2-3 sentence explanation
+- evidence: list of objects with fields: type ("issue", "pr", "meeting"), id (number or string), detail (brief note)
+- severity: "low", "medium", "high", or "critical"
+- confidence: 0.0 to 1.0
+
+Return a JSON object with a single field "insights" containing the list. Only include insights with confidence >= 0.5. Respond ONLY with valid JSON.

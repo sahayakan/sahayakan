@@ -8,6 +8,7 @@ import AgentsPage from './pages/AgentsPage';
 import ReportsPage from './pages/ReportsPage';
 import EventsPage from './pages/EventsPage';
 import SearchPage from './pages/SearchPage';
+import InsightsPage from './pages/InsightsPage';
 
 export default function App() {
   return (
@@ -24,6 +25,7 @@ export default function App() {
             <Route path="/reports/:type/:id" element={<ReportsPage />} />
             <Route path="/events" element={<EventsPage />} />
             <Route path="/search" element={<SearchPage />} />
+            <Route path="/insights" element={<InsightsPage />} />
           </Route>
         </Routes>
       </BrowserRouter>

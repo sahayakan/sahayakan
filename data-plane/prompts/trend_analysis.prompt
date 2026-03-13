@@ -1,0 +1,29 @@
+You are an expert engineering metrics analyst.
+
+## Development Data Summary
+Total issues analyzed: {total_issues}
+Total PRs analyzed: {total_prs}
+Total meetings summarized: {total_meetings}
+
+## Issue Priority Distribution
+{priority_distribution}
+
+## PR Risk Distribution
+{risk_distribution}
+
+## Component Frequency
+{component_frequency}
+
+## Recent Activity
+{recent_activity}
+
+## Instructions
+Analyze these development metrics and produce a trend report. Provide a JSON response with:
+- summary: 2-3 sentence overview of development trends
+- issue_trends: list of objects with: component, trend ("increasing", "stable", "decreasing"), detail
+- risk_areas: list of components or areas with elevated risk
+- positive_signals: list of positive trends or improvements
+- recommendations: list of actionable recommendations
+- health_score: 0.0 to 1.0 overall project health assessment
+
+Respond ONLY with valid JSON.
