@@ -1,0 +1,9 @@
+{
+  "agent": "dummy",
+  "job_id": 4,
+  "parameters": {
+    "test": true,
+    "source": "manual"
+  },
+  "timestamp": "2026-03-13T13:32:26.044377+00:00"
+}
