@@ -59,6 +59,8 @@ services:
       API_HOST: "0.0.0.0"
       API_PORT: "8000"
       AUTH_ENABLED: ${AUTH_ENABLED:-true}
+      GITHUB_TOKEN: ${GITHUB_TOKEN:-}
+      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
     volumes:
       - knowledge_cache:/data/knowledge-cache
     depends_on:
