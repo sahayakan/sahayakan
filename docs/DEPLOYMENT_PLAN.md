@@ -323,6 +323,7 @@ The following was performed to prepare the server for CD (these steps only need 
 8. Configured firewall: `ufw allow 22,80,443/tcp` + deny all other incoming
 9. Enabled fail2ban with SSH jail
 10. Added three GitHub secrets via `gh secret set`
+11. Created admin API key and enabled `AUTH_ENABLED=true`
 
 ### 6.7 Checklist
 
@@ -383,3 +384,25 @@ Monitor disk usage: `df -h / /data` and `docker system df`
 - [x] Set up automated backups — daily at 3 AM UTC, 7-day retention
 - [x] Enable unattended security updates — daily apt update + auto-install + weekly autoclean
 - [x] Attach EBS volume (`vol-0d5c096c225e7d210`, 100GB) mounted at `/data`
+- [x] Enable authentication — `AUTH_ENABLED=true`, admin API key created
+
+## Authentication
+
+Auth is enforced via middleware on all routes except public ones (`/health`, `/docs`, `/openapi.json`, `/redoc`).
+
+**API key**: Pass via `Authorization: Bearer <key>` header.
+
+**Admin key** (`admin-master`): Created during initial setup. The key value is stored only
+in the production `.env` — it is **not** in version control. If lost, a new key must be
+created directly in the database.
+
+**Scopes**: `read`, `write`, `admin`. Admin scope grants full access.
+
+To create additional keys (requires the admin key):
+
+```bash
+curl -X POST https://ai.helm-team.org/api-keys \
+  -H "Authorization: Bearer <admin-key>" \
+  -H "Content-Type: application/json" \
+  -d '{"name": "my-key", "scopes": ["read", "write"]}'
+```
