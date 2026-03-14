@@ -31,4 +31,10 @@ Read `.env.local` to get SSH_KEY_PATH and AWS_SERVER_IP. Then run the following 
    ssh -i {SSH_KEY_PATH} admin@{AWS_SERVER_IP} "sudo ufw status"
    ```
 
+8. **Cache headers** (verify web-ui serves correct Cache-Control):
+   ```
+   curl -sI -u admin:sahayakan2026 https://ai.helm-team.org/ | grep -i cache-control
+   ```
+   Expected: `cache-control: no-cache`. If missing or showing `max-age=3600`, the serve.json or Caddy config needs attention.
+
 Summarize overall production health with a clear status for each check (OK / WARNING / ERROR).
