@@ -115,15 +115,29 @@ HTTP requests are redirected to HTTPS (308).
 ```
 # /etc/caddy/Caddyfile
 ai.helm-team.org {
-    handle /health {
-        reverse_proxy localhost:8000
+    @notHealthNotOptionsNotWebhook {
+        not path /health
+        not path /api/webhooks/*
+        not method OPTIONS
     }
-    # ... all other API route handles (same as Option B) ...
-    handle {
-        reverse_proxy localhost:3000
+
+    basicauth @notHealthNotOptionsNotWebhook {
+        admin <bcrypt-hash>
     }
+
+    handle /health        { reverse_proxy localhost:8000 }
+    handle /metrics       { reverse_proxy localhost:8000 }
+    handle /docs          { reverse_proxy localhost:8000 }
+    handle /openapi.json  { reverse_proxy localhost:8000 }
+    handle_path /api/*    { reverse_proxy localhost:8000 }
+    handle /ws/*          { reverse_proxy localhost:8000 }
+    handle                { reverse_proxy localhost:3000 }
 }
 ```
+
+> **Note**: `/api/webhooks/*` is excluded from basic auth because GitHub webhook
+> deliveries cannot include basic auth credentials. Webhooks are instead authenticated
+> via HMAC-SHA256 signature verification in the API server.
 
 **Option B — IP-only (no TLS)**:
 
@@ -401,8 +415,8 @@ unauthorized access to both the web UI and all API endpoints.
 
 - **Username**: `admin`
 - **Password**: stored in `.env.local` (not in version control)
-- **Excluded**: `/health` — remains open for the CD pipeline health check
-- **Config**: `/etc/caddy/Caddyfile` uses a named matcher `@notHealth` to skip auth on `/health`
+- **Excluded**: `/health` and `/api/webhooks/*` — health check remains open for the CD pipeline, webhook paths are open for GitHub webhook delivery (webhooks use HMAC signature verification instead)
+- **Config**: `/etc/caddy/Caddyfile` uses a named matcher `@notHealthNotOptionsNotWebhook` to skip auth on excluded paths
 
 ### Layer 2: API Key Auth
 
@@ -410,36 +424,63 @@ API endpoints additionally require an API key via `Authorization: Bearer <key>` 
 This is enforced by middleware in the API server when `AUTH_ENABLED=true`.
 
 - **Public routes** (no API key needed): `/health`, `/docs`, `/openapi.json`, `/redoc`
+- **Webhook routes** (`/webhooks/*`): Bypassed by auth middleware — webhooks authenticate via HMAC signature verification, not API keys
 - **Scopes**: `read`, `write`, `admin`. Admin scope grants full access.
 - **Admin key** (`admin-master`): stored in `.env.local` as `SAHAYAKAN_ADMIN_API_KEY`
 
-## GitHub App Setup (Optional)
+## GitHub App
 
-A GitHub App provides fine-grained permissions, short-lived auto-refreshing tokens, and built-in webhooks.
-To set up a GitHub App:
+A GitHub App named `sahayakan` is registered under the `sahayakan` GitHub org. It provides fine-grained permissions, short-lived auto-refreshing tokens, and webhook delivery.
 
-1. **Create the App** at `https://github.com/settings/apps/new` with these permissions:
-   - **Repository permissions**: Issues (Read & Write), Pull requests (Read & Write), Contents (Read), Metadata (Read)
-   - **Webhook URL**: `https://ai.helm-team.org/api/webhooks/github`
-   - **Webhook secret**: Generate with `openssl rand -hex 20`
+**Current config**:
 
-2. **Generate a private key** from the app settings page (Downloads a `.pem` file)
+| Field | Value |
+|---|---|
+| **App name** | `sahayakan` |
+| **App ID** | `3089443` |
+| **Installation ID** | `116291989` (org: `sahayakan`) |
+| **Webhook URL** | `https://ai.helm-team.org/api/webhooks/github` |
+| **Webhook secret** | Set in `.env` as `GITHUB_WEBHOOK_SECRET` (also stored per-app in DB) |
+| **Settings URL** | `https://github.com/organizations/sahayakan/settings/apps/sahayakan` |
 
-3. **Install the app** on your organization/account (note the installation ID from the URL)
+**Permissions**: Issues (Read & Write), Pull requests (Read & Write), Contents (Read), Metadata (Read)
 
-4. **Configure in Sahayakan**:
-   - Go to Settings > GitHub Integration > Add GitHub App
-   - Enter the App ID, name, private key (paste .pem contents), and webhook secret
-   - Add the installation (installation ID + account login)
-   - Use "Test Connection" to verify credentials
+**Subscribed events**: Issues, Pull request, Issue comment
 
-5. **Link repositories**: Edit a repository in Settings and set auth mode to "app" with the installation
+### Webhook Flow
 
-To create additional keys (requires the admin key):
+1. GitHub sends POST to `https://ai.helm-team.org/api/webhooks/github`
+2. Caddy passes through without basic auth (webhook paths are excluded)
+3. API auth middleware passes through (webhook routes are excluded)
+4. Webhook handler verifies HMAC-SHA256 signature against all configured secrets (env var + DB)
+5. Valid events are published to the `events` table
+
+### Registration CLI
+
+To register a new GitHub App or re-register:
 
 ```bash
-curl -u admin:<basic-auth-pass> -X POST https://ai.helm-team.org/api-keys \
-  -H "Authorization: Bearer <admin-api-key>" \
+bash cli/register_github_app.sh \
+  --app-id <APP_ID> \
+  --app-name "<NAME>" \
+  --private-key-file /path/to/key.pem \
+  --webhook-secret "<SECRET>" \
+  --api-url "https://ai.helm-team.org/api"
+```
+
+The script uses Caddy basic auth (not Bearer tokens) to avoid header conflicts.
+
+### Creating Additional API Keys
+
+To create additional API keys (requires the admin key):
+
+```bash
+curl -u admin:<basic-auth-pass> -X POST https://ai.helm-team.org/api/api-keys \
   -H "Content-Type: application/json" \
   -d '{"name": "my-key", "scopes": ["read", "write"]}'
 ```
+
+> **Note**: When Caddy basic auth is in front, do not send both `-u` (basic auth) and
+> `Authorization: Bearer` header in the same curl request — the explicit header overrides
+> basic auth, and Caddy rejects the Bearer token. Use basic auth alone (the API middleware
+> passes it through).
