@@ -71,7 +71,7 @@ jobs:
             docker exec infrastructure-postgres-1 psql \
               -U sahayakan -d sahayakan \
               -f "/docker-entrypoint-initdb.d/$(basename $f)" \
-              -v ON_ERROR_STOP=0 2>&1 | tail -1
+              -v ON_ERROR_STOP=0 < /dev/null 2>&1 | tail -1
           done
           echo "Migrations complete."
 
@@ -84,7 +84,7 @@ jobs:
           # Wait for api-server healthcheck (up to 60s)
           echo "Waiting for api-server health..."
           for i in $(seq 1 12); do
-            if docker compose -f docker-compose.prod.yml exec -T api-server python3 -c "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')" 2>/dev/null; then
+            if docker compose -f docker-compose.prod.yml exec -T api-server python3 -c "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')" < /dev/null 2>/dev/null; then
               echo "api-server healthy after $((i * 5))s"
               break
             fi
