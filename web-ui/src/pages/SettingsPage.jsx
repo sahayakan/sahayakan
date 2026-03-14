@@ -3,7 +3,7 @@ import {
   Box, Typography, Button, IconButton, Switch, Dialog, DialogTitle,
   DialogContent, DialogActions, TextField, MenuItem, Table, TableBody,
   TableCell, TableContainer, TableHead, TableRow, Paper, Chip, Alert,
-  CircularProgress,
+  CircularProgress, Tabs, Tab,
 } from '@mui/material';
 import AddIcon from '@mui/icons-material/Add';
 import EditIcon from '@mui/icons-material/Edit';
@@ -18,14 +18,14 @@ const PROVIDERS = ['github', 'gitlab', 'bitbucket'];
 const EMPTY_REPO_FORM = { name: '', url: '', provider: 'github', default_branch: 'main' };
 const EMPTY_JIRA_FORM = { name: '', project_key: '', base_url: '' };
 const EMPTY_GITHUB_APP_FORM = { app_id: '', app_name: '', private_key: '', webhook_secret: '' };
-const EMPTY_INSTALLATION_FORM = { installation_id: '', account_login: '', account_type: 'Organization' };
-
 export default function SettingsPage() {
   // --- Repositories ---
   const { data: repos, refresh: refreshRepos } = usePolling(
     useCallback(() => api.get('/repositories'), []),
     10000,
   );
+
+  const [tab, setTab] = useState(0);
 
   const [repoDialogOpen, setRepoDialogOpen] = useState(false);
   const [repoEditId, setRepoEditId] = useState(null);
@@ -129,8 +129,6 @@ export default function SettingsPage() {
   // Installations
   const [instAppId, setInstAppId] = useState(null);
   const [installations, setInstallations] = useState([]);
-  const [instDialogOpen, setInstDialogOpen] = useState(false);
-  const [instForm, setInstForm] = useState(EMPTY_INSTALLATION_FORM);
   const [instDeleteConfirm, setInstDeleteConfirm] = useState(null);
   const [discoveringInstId, setDiscoveringInstId] = useState(null);
   const [discoverResult, setDiscoverResult] = useState(null);
@@ -205,73 +203,74 @@ export default function SettingsPage() {
     } catch { setInstallations([]); }
   };
 
-  const handleAddInstallation = async () => {
-    await api.post(`/github-app/${instAppId}/installations`, {
-      ...instForm,
-      installation_id: Number(instForm.installation_id),
-    });
-    setInstDialogOpen(false);
-    openInstallations(instAppId);
-  };
-
   const handleDeleteInstallation = async (instId) => {
     await api.delete(`/github-app/${instAppId}/installations/${instId}`);
     setInstDeleteConfirm(null);
     openInstallations(instAppId);
   };
 
-  const setInstField = (field) => (e) => setInstForm({ ...instForm, [field]: e.target.value });
-
   return (
     <Box>
-      <Typography variant="h5" sx={{ mb: 3 }}>Settings</Typography>
+      <Typography variant="h5" sx={{ mb: 2 }}>Settings</Typography>
 
-      {/* Repositories Section */}
-      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
-        <Typography variant="h6">Repositories</Typography>
-        <Button variant="contained" size="small" startIcon={<AddIcon />} onClick={openAddRepo}>
-          Add Repository
-        </Button>
-      </Box>
-      <TableContainer component={Paper} sx={{ mb: 4 }}>
-        <Table>
-          <TableHead>
-            <TableRow>
-              <TableCell>Name</TableCell>
-              <TableCell>URL</TableCell>
-              <TableCell>Provider</TableCell>
-              <TableCell>Branch</TableCell>
-              <TableCell>Active</TableCell>
-              <TableCell align="right">Actions</TableCell>
-            </TableRow>
-          </TableHead>
-          <TableBody>
-            {(repos || []).map((repo) => (
-              <TableRow key={repo.id}>
-                <TableCell>{repo.name}</TableCell>
-                <TableCell sx={{ maxWidth: 300, overflow: 'hidden', textOverflow: 'ellipsis' }}>{repo.url}</TableCell>
-                <TableCell><Chip label={repo.provider} size="small" /></TableCell>
-                <TableCell>{repo.default_branch}</TableCell>
-                <TableCell>
-                  <Switch checked={repo.is_active} onChange={() => handleToggleRepoActive(repo)} size="small" />
-                </TableCell>
-                <TableCell align="right">
-                  <IconButton size="small" onClick={() => openEditRepo(repo)}><EditIcon fontSize="small" /></IconButton>
-                  <IconButton size="small" color="error" onClick={() => setRepoDeleteConfirm(repo.id)}><DeleteIcon fontSize="small" /></IconButton>
-                </TableCell>
-              </TableRow>
-            ))}
-            {repos && repos.length === 0 && (
-              <TableRow>
-                <TableCell colSpan={6} align="center" sx={{ color: 'text.secondary', py: 4 }}>
-                  No repositories configured. Click &quot;Add Repository&quot; to get started.
-                </TableCell>
-              </TableRow>
-            )}
-          </TableBody>
-        </Table>
-      </TableContainer>
+      <Tabs value={tab} onChange={(_, v) => setTab(v)} sx={{ mb: 3 }}>
+        <Tab label="Repositories" />
+        <Tab label="Integrations" />
+      </Tabs>
 
+      {/* Repositories Tab */}
+      {tab === 0 && (
+        <>
+          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
+            <Typography variant="h6">Repositories</Typography>
+            <Button variant="contained" size="small" startIcon={<AddIcon />} onClick={openAddRepo}>
+              Add Repository
+            </Button>
+          </Box>
+          <TableContainer component={Paper} sx={{ mb: 4 }}>
+            <Table>
+              <TableHead>
+                <TableRow>
+                  <TableCell>Name</TableCell>
+                  <TableCell>URL</TableCell>
+                  <TableCell>Provider</TableCell>
+                  <TableCell>Branch</TableCell>
+                  <TableCell>Active</TableCell>
+                  <TableCell align="right">Actions</TableCell>
+                </TableRow>
+              </TableHead>
+              <TableBody>
+                {(repos || []).map((repo) => (
+                  <TableRow key={repo.id}>
+                    <TableCell>{repo.name}</TableCell>
+                    <TableCell sx={{ maxWidth: 300, overflow: 'hidden', textOverflow: 'ellipsis' }}>{repo.url}</TableCell>
+                    <TableCell><Chip label={repo.provider} size="small" /></TableCell>
+                    <TableCell>{repo.default_branch}</TableCell>
+                    <TableCell>
+                      <Switch checked={repo.is_active} onChange={() => handleToggleRepoActive(repo)} size="small" />
+                    </TableCell>
+                    <TableCell align="right">
+                      <IconButton size="small" onClick={() => openEditRepo(repo)}><EditIcon fontSize="small" /></IconButton>
+                      <IconButton size="small" color="error" onClick={() => setRepoDeleteConfirm(repo.id)}><DeleteIcon fontSize="small" /></IconButton>
+                    </TableCell>
+                  </TableRow>
+                ))}
+                {repos && repos.length === 0 && (
+                  <TableRow>
+                    <TableCell colSpan={6} align="center" sx={{ color: 'text.secondary', py: 4 }}>
+                      No repositories configured. Click &quot;Add Repository&quot; to get started.
+                    </TableCell>
+                  </TableRow>
+                )}
+              </TableBody>
+            </Table>
+          </TableContainer>
+        </>
+      )}
+
+      {/* Integrations Tab */}
+      {tab === 1 && (
+        <>
       {/* Jira Projects Section */}
       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
         <Typography variant="h6">Jira Projects</Typography>
@@ -376,12 +375,7 @@ export default function SettingsPage() {
         <Box sx={{ mb: 4 }}>
           <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
             <Typography variant="subtitle1">Installations for App #{instAppId}</Typography>
-            <Box>
-              <Button size="small" startIcon={<AddIcon />} onClick={() => { setInstForm(EMPTY_INSTALLATION_FORM); setInstDialogOpen(true); }}>
-                Add Installation
-              </Button>
-              <Button size="small" onClick={() => setInstAppId(null)}>Close</Button>
-            </Box>
+            <Button size="small" onClick={() => setInstAppId(null)}>Close</Button>
           </Box>
           <TableContainer component={Paper}>
             <Table size="small">
@@ -415,7 +409,7 @@ export default function SettingsPage() {
                 {installations.length === 0 && (
                   <TableRow>
                     <TableCell colSpan={5} align="center" sx={{ color: 'text.secondary', py: 2 }}>
-                      No installations. Add one to enable GitHub App auth for repositories.
+                      No installations yet. Install the GitHub App on an organization to see installations here.
                     </TableCell>
                   </TableRow>
                 )}
@@ -430,6 +424,8 @@ export default function SettingsPage() {
             </Alert>
           )}
         </Box>
+      )}
+        </>
       )}
 
       {/* GitHub App Add/Edit Dialog */}
@@ -463,26 +459,6 @@ export default function SettingsPage() {
         <DialogActions>
           <Button onClick={() => setAppDeleteConfirm(null)}>Cancel</Button>
           <Button color="error" variant="contained" onClick={() => handleDeleteApp(appDeleteConfirm)}>Delete</Button>
-        </DialogActions>
-      </Dialog>
-
-      {/* Installation Add Dialog */}
-      <Dialog open={instDialogOpen} onClose={() => setInstDialogOpen(false)} maxWidth="sm" fullWidth>
-        <DialogTitle>Add Installation</DialogTitle>
-        <DialogContent sx={{ display: 'flex', flexDirection: 'column', gap: 2, pt: '16px !important' }}>
-          <TextField label="Installation ID" value={instForm.installation_id} onChange={setInstField('installation_id')}
-            required fullWidth type="number" helperText="Find this in your GitHub App's installation settings URL" />
-          <TextField label="Account Login" value={instForm.account_login} onChange={setInstField('account_login')}
-            required fullWidth helperText="Organization or user name where the app is installed" />
-          <TextField label="Account Type" value={instForm.account_type} onChange={setInstField('account_type')} select fullWidth>
-            <MenuItem value="Organization">Organization</MenuItem>
-            <MenuItem value="User">User</MenuItem>
-          </TextField>
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setInstDialogOpen(false)}>Cancel</Button>
-          <Button variant="contained" onClick={handleAddInstallation}
-            disabled={!instForm.installation_id || !instForm.account_login}>Save</Button>
         </DialogActions>
       </Dialog>
 
