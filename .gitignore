@@ -38,6 +38,9 @@ minio_data/
 knowledge-cache/agent_outputs/
 knowledge-cache/slack/
 
+# MkDocs
+_site/
+
 # Test
 .pytest_cache/
 .coverage

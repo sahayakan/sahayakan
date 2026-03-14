@@ -1,0 +1,71 @@
+site_name: Sahayakan User Manual
+site_description: User manual for the Sahayakan agentic AI platform
+site_url: https://sahayakan.github.io/sahayakan/
+repo_url: https://github.com/sahayakan/sahayakan
+repo_name: sahayakan/sahayakan
+
+theme:
+  name: material
+  palette:
+    - scheme: default
+      primary: indigo
+      accent: amber
+      toggle:
+        icon: material/brightness-7
+        name: Switch to dark mode
+    - scheme: slate
+      primary: indigo
+      accent: amber
+      toggle:
+        icon: material/brightness-4
+        name: Switch to light mode
+  features:
+    - navigation.sections
+    - navigation.expand
+    - navigation.top
+    - search.highlight
+    - content.code.copy
+
+nav:
+  - Home: index.md
+  - Getting Started:
+      - Prerequisites: getting-started/prerequisites.md
+      - Installation: getting-started/installation.md
+      - Quick Start: getting-started/quickstart.md
+  - Web Dashboard:
+      - Overview: dashboard/overview.md
+      - Agents: dashboard/agents.md
+      - Jobs: dashboard/jobs.md
+      - Reports: dashboard/reports.md
+      - Insights: dashboard/insights.md
+      - Search: dashboard/search.md
+      - Settings: dashboard/settings.md
+  - Agents:
+      - Overview: agents/overview.md
+      - Issue Triage: agents/issue-triage.md
+      - PR Context: agents/pr-context.md
+      - Meeting Summary: agents/meeting-summary.md
+      - Slack Digest: agents/slack-digest.md
+      - Insights: agents/insights.md
+      - Trend Analysis: agents/trend-analysis.md
+  - Integrations:
+      - GitHub App: integrations/github-app.md
+      - Jira: integrations/jira.md
+      - Slack: integrations/slack.md
+  - CLI Reference: cli.md
+  - API Reference: api.md
+  - Architecture: architecture.md
+
+markdown_extensions:
+  - admonition
+  - pymdownx.details
+  - pymdownx.superfences
+  - pymdownx.tabbed:
+      alternate_style: true
+  - pymdownx.highlight:
+      anchor_linenums: true
+  - pymdownx.inlinehilite
+  - attr_list
+  - md_in_html
+  - toc:
+      permalink: true
