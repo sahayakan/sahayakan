@@ -77,12 +77,21 @@ After creating the app:
 2. Choose the organization or account to install on
 3. Select **All repositories** or choose specific repositories
 4. Click **Install**
-5. Note the **Installation ID** from the URL after installation:
-   `https://github.com/settings/installations/12345678` — the ID is `12345678`
+
+!!! success "Auto-Registration"
+    When someone installs the app, Sahayakan **automatically registers the installation** via webhook. No manual step is needed — the installation ID, account login, and account type are recorded automatically.
+
+    The webhook also handles **uninstalls** (soft-deletes the installation), **suspends**, and **unsuspends** (toggles the installation's active status).
+
+If auto-registration is not available (e.g., webhooks are not configured), you can register installations manually — see below.
 
 ## Registering in Sahayakan
 
-### Via CLI (Recommended)
+### Automatic (via Webhook)
+
+If webhooks are configured, installations are registered automatically when users install the app. You only need to register the **GitHub App credentials** (App ID, private key, webhook secret) — installations are handled by the webhook.
+
+### Via CLI (Manual)
 
 Use the registration script with the values from the steps above:
 
@@ -191,6 +200,10 @@ When configured, GitHub sends events to Sahayakan in real time. The following ev
 | `pull_request` | `opened` | `pr.ingested` |
 | `pull_request` | `synchronize`, `edited` | `pr.updated` |
 | `issue_comment` | `created` | `issue.commented` |
+| `installation` | `created` | Auto-registers installation |
+| `installation` | `deleted` | Soft-deletes installation |
+| `installation` | `suspend` | Deactivates installation |
+| `installation` | `unsuspend` | Reactivates installation |
 
 ### Webhook Flow
 

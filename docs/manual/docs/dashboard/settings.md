@@ -43,7 +43,8 @@ Manage GitHub App configuration for repository access.
 1. Click **Add GitHub App**
 2. Enter the App ID, name, private key (PEM), and webhook secret
 3. Click **Save**
-4. Add installations using the **Add Installation** button
+
+Installations are **auto-registered** when users install the app (via webhook). You can also manually add installations using the **Add Installation** button.
 
 **Testing the connection** — Click **Test** to verify credentials are valid.
 
