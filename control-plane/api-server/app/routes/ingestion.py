@@ -48,15 +48,49 @@ def _get_knowledge_cache():
     return KnowledgeCache(settings.knowledge_cache_path)
 
 
-@router.post("/github/sync")
-async def github_sync(request: GitHubSyncRequest):
+async def _resolve_token_provider(owner: str, repo: str):
+    """Resolve a GitHubTokenProvider based on repository auth_mode.
+
+    Checks the repositories table for a GitHub App installation link.
+    Falls back to GITHUB_TOKEN env var (PAT) if no app is configured.
+    """
+    _setup_paths()
+    from ingestion.github_fetcher.token_provider import GitHubAppTokenProvider, PATTokenProvider
+
+    try:
+        from app.database import get_pool
+
+        pool = await get_pool()
+        row = await pool.fetchrow(
+            "SELECT r.auth_mode, r.github_installation_id, "
+            "i.installation_id, ga.app_id, ga.private_key_encrypted "
+            "FROM repositories r "
+            "LEFT JOIN github_app_installations i ON r.github_installation_id = i.id "
+            "LEFT JOIN github_apps ga ON i.github_app_id = ga.id "
+            "WHERE r.url LIKE $1 AND r.is_active = true",
+            f"%{owner}/{repo}%",
+        )
+        if row and row["auth_mode"] == "app" and row["installation_id"]:
+            return GitHubAppTokenProvider(
+                app_id=row["app_id"],
+                private_key=row["private_key_encrypted"],
+                installation_id=row["installation_id"],
+            )
+    except Exception:
+        pass
+
+    # Fallback to PAT
     token = os.environ.get("GITHUB_TOKEN")
     if not token:
         raise HTTPException(
             status_code=500,
-            detail="GITHUB_TOKEN environment variable not set",
+            detail="No GitHub App configured for this repo and GITHUB_TOKEN not set",
         )
+    return PATTokenProvider(token)
 
+
+@router.post("/github/sync")
+async def github_sync(request: GitHubSyncRequest):
     try:
         _setup_paths()
         from ingestion.github_fetcher.fetcher import GitHubFetcher
@@ -66,8 +100,9 @@ async def github_sync(request: GitHubSyncRequest):
             detail="Ingestion modules not available in this deployment",
         ) from e
 
+    provider = await _resolve_token_provider(request.owner, request.repo)
     cache = _get_knowledge_cache()
-    fetcher = GitHubFetcher(token=token, knowledge_cache=cache)
+    fetcher = GitHubFetcher(token_provider=provider, knowledge_cache=cache)
 
     result = fetcher.sync_repo(
         owner=request.owner,

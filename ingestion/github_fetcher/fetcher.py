@@ -14,6 +14,7 @@ from datetime import UTC, datetime
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "..", "data-plane"))
 from agent_runner.knowledge import KnowledgeCache
+from ingestion.github_fetcher.token_provider import GitHubTokenProvider, PATTokenProvider
 
 
 @dataclass
@@ -27,13 +28,23 @@ class SyncResult:
 class GitHubFetcher:
     API_BASE = "https://api.github.com"
 
-    def __init__(self, token: str, knowledge_cache: KnowledgeCache):
-        self.token = token
+    def __init__(
+        self,
+        knowledge_cache: KnowledgeCache,
+        token: str | None = None,
+        token_provider: GitHubTokenProvider | None = None,
+    ):
+        if token_provider:
+            self.token_provider = token_provider
+        elif token:
+            self.token_provider = PATTokenProvider(token)
+        else:
+            raise ValueError("Either token or token_provider must be provided")
         self.cache = knowledge_cache
 
     def _request(self, url: str) -> dict | list:
         req = urllib.request.Request(url)
-        req.add_header("Authorization", f"token {self.token}")
+        req.add_header("Authorization", f"Bearer {self.token_provider.get_token()}")
         req.add_header("Accept", "application/vnd.github.v3+json")
         req.add_header("User-Agent", "sahayakan-ingestion")
         with urllib.request.urlopen(req) as resp:

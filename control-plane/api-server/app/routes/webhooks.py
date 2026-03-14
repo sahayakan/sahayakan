@@ -20,6 +20,23 @@ def _verify_github_signature(payload: bytes, signature: str, secret: str) -> boo
     return hmac.compare_digest(f"sha256={expected}", signature)
 
 
+async def _get_webhook_secrets() -> list[str]:
+    """Collect all configured webhook secrets (env var + GitHub Apps in DB)."""
+    secrets = []
+    env_secret = os.environ.get("GITHUB_WEBHOOK_SECRET")
+    if env_secret:
+        secrets.append(env_secret)
+    try:
+        pool = await get_pool()
+        rows = await pool.fetch("SELECT webhook_secret FROM github_apps WHERE webhook_secret IS NOT NULL")
+        for row in rows:
+            if row["webhook_secret"]:
+                secrets.append(row["webhook_secret"])
+    except Exception:
+        pass
+    return secrets
+
+
 @router.post("/github")
 async def github_webhook(request: Request):
     """Handle GitHub webhook events.
@@ -33,11 +50,11 @@ async def github_webhook(request: Request):
     """
     body = await request.body()
 
-    # Verify signature if secret is configured
-    webhook_secret = os.environ.get("GITHUB_WEBHOOK_SECRET")
-    if webhook_secret:
+    # Verify signature against all configured secrets
+    secrets = await _get_webhook_secrets()
+    if secrets:
         signature = request.headers.get("X-Hub-Signature-256", "")
-        if not _verify_github_signature(body, signature, webhook_secret):
+        if not any(_verify_github_signature(body, signature, s) for s in secrets):
             raise HTTPException(status_code=401, detail="Invalid signature")
 
     event_type = request.headers.get("X-GitHub-Event", "")

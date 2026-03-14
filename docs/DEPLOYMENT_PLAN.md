@@ -414,6 +414,30 @@ This is enforced by middleware in the API server when `AUTH_ENABLED=true`.
 - **Scopes**: `read`, `write`, `admin`. Admin scope grants full access.
 - **Admin key** (`admin-master`): stored in `.env.local` as `SAHAYAKAN_ADMIN_API_KEY`
 
+## GitHub App Setup (Optional)
+
+A GitHub App provides fine-grained permissions, short-lived auto-refreshing tokens, and built-in webhooks.
+To set up a GitHub App:
+
+1. **Create the App** at `https://github.com/settings/apps/new` with these permissions:
+   - **Repository permissions**: Issues (Read & Write), Pull requests (Read & Write), Contents (Read), Metadata (Read)
+   - **Webhook URL**: `https://ai.helm-team.org/api/webhooks/github`
+   - **Webhook secret**: Generate with `openssl rand -hex 20`
+
+2. **Generate a private key** from the app settings page (Downloads a `.pem` file)
+
+3. **Install the app** on your organization/account (note the installation ID from the URL)
+
+4. **Configure in Sahayakan**:
+   - Go to Settings > GitHub Integration > Add GitHub App
+   - Enter the App ID, name, private key (paste .pem contents), and webhook secret
+   - Add the installation (installation ID + account login)
+   - Use "Test Connection" to verify credentials
+
+5. **Link repositories**: Edit a repository in Settings and set auth mode to "app" with the installation
+
+PAT authentication remains as a fallback when no GitHub App is configured for a repository.
+
 To create additional keys (requires the admin key):
 
 ```bash

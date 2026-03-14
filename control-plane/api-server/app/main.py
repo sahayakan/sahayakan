@@ -11,6 +11,7 @@ from app.routes import (
     agents,
     auth,
     events,
+    github_app,
     ingestion,
     insights,
     jira_projects,
@@ -101,6 +102,7 @@ app.include_router(search.router)
 app.include_router(usage.router)
 app.include_router(repositories.router)
 app.include_router(jira_projects.router)
+app.include_router(github_app.router)
 app.include_router(webhooks.router)
 app.include_router(websocket.router)
 

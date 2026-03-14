@@ -37,8 +37,8 @@ sys.path.insert(0, "data-plane")
 - **Image**: `pgvector/pgvector:pg16`
 - **Host port**: 5433 (maps to container 5432, avoids local Postgres conflict)
 - **Credentials**: user=sahayakan, password=sahayakan_dev_password, db=sahayakan
-- **Migrations**: `infrastructure/db/migrations/` numbered `001_` through `005_`
-- **Next migration number**: 008
+- **Migrations**: `infrastructure/db/migrations/` numbered `001_` through `008_`
+- **Next migration number**: 009
 
 ## Development Setup
 

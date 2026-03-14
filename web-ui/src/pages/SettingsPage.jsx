@@ -2,11 +2,13 @@ import { useCallback, useState } from 'react';
 import {
   Box, Typography, Button, IconButton, Switch, Dialog, DialogTitle,
   DialogContent, DialogActions, TextField, MenuItem, Table, TableBody,
-  TableCell, TableContainer, TableHead, TableRow, Paper, Chip,
+  TableCell, TableContainer, TableHead, TableRow, Paper, Chip, Alert,
+  CircularProgress,
 } from '@mui/material';
 import AddIcon from '@mui/icons-material/Add';
 import EditIcon from '@mui/icons-material/Edit';
 import DeleteIcon from '@mui/icons-material/Delete';
+import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import usePolling from '../hooks/usePolling';
 import { api } from '../api/client';
 
@@ -14,6 +16,8 @@ const PROVIDERS = ['github', 'gitlab', 'bitbucket'];
 
 const EMPTY_REPO_FORM = { name: '', url: '', provider: 'github', default_branch: 'main' };
 const EMPTY_JIRA_FORM = { name: '', project_key: '', base_url: '' };
+const EMPTY_GITHUB_APP_FORM = { app_id: '', app_name: '', private_key: '', webhook_secret: '' };
+const EMPTY_INSTALLATION_FORM = { installation_id: '', account_login: '', account_type: 'Organization' };
 
 export default function SettingsPage() {
   // --- Repositories ---
@@ -108,6 +112,100 @@ export default function SettingsPage() {
 
   const setJiraField = (field) => (e) => setJiraForm({ ...jiraForm, [field]: e.target.value });
 
+  // --- GitHub App ---
+  const { data: githubApps, refresh: refreshApps } = usePolling(
+    useCallback(() => api.get('/github-app'), []),
+    10000,
+  );
+
+  const [appDialogOpen, setAppDialogOpen] = useState(false);
+  const [appEditId, setAppEditId] = useState(null);
+  const [appForm, setAppForm] = useState(EMPTY_GITHUB_APP_FORM);
+  const [appDeleteConfirm, setAppDeleteConfirm] = useState(null);
+  const [appTestResult, setAppTestResult] = useState(null);
+  const [appTesting, setAppTesting] = useState(false);
+
+  // Installations
+  const [instAppId, setInstAppId] = useState(null);
+  const [installations, setInstallations] = useState([]);
+  const [instDialogOpen, setInstDialogOpen] = useState(false);
+  const [instForm, setInstForm] = useState(EMPTY_INSTALLATION_FORM);
+  const [instDeleteConfirm, setInstDeleteConfirm] = useState(null);
+
+  const openAddApp = () => {
+    setAppEditId(null);
+    setAppForm(EMPTY_GITHUB_APP_FORM);
+    setAppTestResult(null);
+    setAppDialogOpen(true);
+  };
+
+  const openEditApp = (app) => {
+    setAppEditId(app.id);
+    setAppForm({ app_id: app.app_id, app_name: app.app_name, private_key: '', webhook_secret: app.webhook_secret || '' });
+    setAppTestResult(null);
+    setAppDialogOpen(true);
+  };
+
+  const handleSaveApp = async () => {
+    const payload = { ...appForm, app_id: Number(appForm.app_id) };
+    if (appEditId) {
+      const updates = {};
+      if (payload.app_name) updates.app_name = payload.app_name;
+      if (payload.private_key) updates.private_key = payload.private_key;
+      if (payload.webhook_secret !== undefined) updates.webhook_secret = payload.webhook_secret;
+      await api.put(`/github-app/${appEditId}`, updates);
+    } else {
+      await api.post('/github-app', payload);
+    }
+    setAppDialogOpen(false);
+    refreshApps();
+  };
+
+  const handleDeleteApp = async (id) => {
+    await api.delete(`/github-app/${id}`);
+    setAppDeleteConfirm(null);
+    refreshApps();
+  };
+
+  const handleTestApp = async (id) => {
+    setAppTesting(true);
+    setAppTestResult(null);
+    try {
+      const result = await api.post(`/github-app/${id}/test`);
+      setAppTestResult({ success: true, ...result });
+    } catch (err) {
+      setAppTestResult({ success: false, error: err?.response?.data?.detail || 'Connection test failed' });
+    }
+    setAppTesting(false);
+  };
+
+  const setAppField = (field) => (e) => setAppForm({ ...appForm, [field]: e.target.value });
+
+  const openInstallations = async (appDbId) => {
+    setInstAppId(appDbId);
+    try {
+      const data = await api.get(`/github-app/${appDbId}/installations`);
+      setInstallations(data);
+    } catch { setInstallations([]); }
+  };
+
+  const handleAddInstallation = async () => {
+    await api.post(`/github-app/${instAppId}/installations`, {
+      ...instForm,
+      installation_id: Number(instForm.installation_id),
+    });
+    setInstDialogOpen(false);
+    openInstallations(instAppId);
+  };
+
+  const handleDeleteInstallation = async (instId) => {
+    await api.delete(`/github-app/${instAppId}/installations/${instId}`);
+    setInstDeleteConfirm(null);
+    openInstallations(instAppId);
+  };
+
+  const setInstField = (field) => (e) => setInstForm({ ...instForm, [field]: e.target.value });
+
   return (
     <Box>
       <Typography variant="h5" sx={{ mb: 3 }}>Settings</Typography>
@@ -201,6 +299,177 @@ export default function SettingsPage() {
           </TableBody>
         </Table>
       </TableContainer>
+
+      {/* GitHub Integration Section */}
+      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1, mt: 4 }}>
+        <Typography variant="h6">GitHub Integration</Typography>
+        <Button variant="contained" size="small" startIcon={<AddIcon />} onClick={openAddApp}>
+          Add GitHub App
+        </Button>
+      </Box>
+      <TableContainer component={Paper} sx={{ mb: 4 }}>
+        <Table>
+          <TableHead>
+            <TableRow>
+              <TableCell>App Name</TableCell>
+              <TableCell>App ID</TableCell>
+              <TableCell>Webhook Secret</TableCell>
+              <TableCell>Installations</TableCell>
+              <TableCell align="right">Actions</TableCell>
+            </TableRow>
+          </TableHead>
+          <TableBody>
+            {(githubApps || []).map((app) => (
+              <TableRow key={app.id}>
+                <TableCell>{app.app_name}</TableCell>
+                <TableCell><Chip label={app.app_id} size="small" variant="outlined" /></TableCell>
+                <TableCell>{app.webhook_secret ? 'Configured' : 'Not set'}</TableCell>
+                <TableCell>
+                  <Button size="small" onClick={() => openInstallations(app.id)}>View</Button>
+                </TableCell>
+                <TableCell align="right">
+                  <Button size="small" onClick={() => handleTestApp(app.id)} disabled={appTesting}>
+                    Test
+                  </Button>
+                  <IconButton size="small" onClick={() => openEditApp(app)}><EditIcon fontSize="small" /></IconButton>
+                  <IconButton size="small" color="error" onClick={() => setAppDeleteConfirm(app.id)}><DeleteIcon fontSize="small" /></IconButton>
+                </TableCell>
+              </TableRow>
+            ))}
+            {githubApps && githubApps.length === 0 && (
+              <TableRow>
+                <TableCell colSpan={5} align="center" sx={{ color: 'text.secondary', py: 4 }}>
+                  No GitHub App configured. Using PAT authentication.
+                </TableCell>
+              </TableRow>
+            )}
+          </TableBody>
+        </Table>
+      </TableContainer>
+
+      {appTestResult && (
+        <Alert severity={appTestResult.success ? 'success' : 'error'} sx={{ mb: 2 }} onClose={() => setAppTestResult(null)}>
+          {appTestResult.success
+            ? `Connected to GitHub App "${appTestResult.app_name}" (${appTestResult.app_slug})`
+            : appTestResult.error}
+        </Alert>
+      )}
+
+      {/* Installations panel */}
+      {instAppId && (
+        <Box sx={{ mb: 4 }}>
+          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
+            <Typography variant="subtitle1">Installations for App #{instAppId}</Typography>
+            <Box>
+              <Button size="small" startIcon={<AddIcon />} onClick={() => { setInstForm(EMPTY_INSTALLATION_FORM); setInstDialogOpen(true); }}>
+                Add Installation
+              </Button>
+              <Button size="small" onClick={() => setInstAppId(null)}>Close</Button>
+            </Box>
+          </Box>
+          <TableContainer component={Paper}>
+            <Table size="small">
+              <TableHead>
+                <TableRow>
+                  <TableCell>Installation ID</TableCell>
+                  <TableCell>Account</TableCell>
+                  <TableCell>Type</TableCell>
+                  <TableCell>Active</TableCell>
+                  <TableCell align="right">Actions</TableCell>
+                </TableRow>
+              </TableHead>
+              <TableBody>
+                {installations.map((inst) => (
+                  <TableRow key={inst.id}>
+                    <TableCell>{inst.installation_id}</TableCell>
+                    <TableCell>{inst.account_login}</TableCell>
+                    <TableCell><Chip label={inst.account_type} size="small" /></TableCell>
+                    <TableCell>{inst.is_active ? <CheckCircleIcon color="success" fontSize="small" /> : 'No'}</TableCell>
+                    <TableCell align="right">
+                      <IconButton size="small" color="error" onClick={() => setInstDeleteConfirm(inst.id)}>
+                        <DeleteIcon fontSize="small" />
+                      </IconButton>
+                    </TableCell>
+                  </TableRow>
+                ))}
+                {installations.length === 0 && (
+                  <TableRow>
+                    <TableCell colSpan={5} align="center" sx={{ color: 'text.secondary', py: 2 }}>
+                      No installations. Add one to enable GitHub App auth for repositories.
+                    </TableCell>
+                  </TableRow>
+                )}
+              </TableBody>
+            </Table>
+          </TableContainer>
+        </Box>
+      )}
+
+      {/* GitHub App Add/Edit Dialog */}
+      <Dialog open={appDialogOpen} onClose={() => setAppDialogOpen(false)} maxWidth="sm" fullWidth>
+        <DialogTitle>{appEditId ? 'Edit GitHub App' : 'Add GitHub App'}</DialogTitle>
+        <DialogContent sx={{ display: 'flex', flexDirection: 'column', gap: 2, pt: '16px !important' }}>
+          <TextField label="App ID" value={appForm.app_id} onChange={setAppField('app_id')} required fullWidth
+            type="number" disabled={!!appEditId} />
+          <TextField label="App Name" value={appForm.app_name} onChange={setAppField('app_name')} required fullWidth />
+          <TextField label="Private Key (PEM)" value={appForm.private_key} onChange={setAppField('private_key')}
+            required={!appEditId} fullWidth multiline rows={4}
+            helperText={appEditId ? 'Leave blank to keep existing key' : 'Paste the .pem file contents'} />
+          <TextField label="Webhook Secret" value={appForm.webhook_secret} onChange={setAppField('webhook_secret')} fullWidth
+            helperText="Optional. Used to verify webhook payloads from this app." />
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setAppDialogOpen(false)}>Cancel</Button>
+          <Button variant="contained" onClick={handleSaveApp}
+            disabled={!appForm.app_name || (!appEditId && (!appForm.app_id || !appForm.private_key))}>
+            Save
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* GitHub App Delete Confirmation */}
+      <Dialog open={!!appDeleteConfirm} onClose={() => setAppDeleteConfirm(null)}>
+        <DialogTitle>Delete GitHub App</DialogTitle>
+        <DialogContent>
+          <Typography>Are you sure? This will also remove all installations linked to this app.</Typography>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setAppDeleteConfirm(null)}>Cancel</Button>
+          <Button color="error" variant="contained" onClick={() => handleDeleteApp(appDeleteConfirm)}>Delete</Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Installation Add Dialog */}
+      <Dialog open={instDialogOpen} onClose={() => setInstDialogOpen(false)} maxWidth="sm" fullWidth>
+        <DialogTitle>Add Installation</DialogTitle>
+        <DialogContent sx={{ display: 'flex', flexDirection: 'column', gap: 2, pt: '16px !important' }}>
+          <TextField label="Installation ID" value={instForm.installation_id} onChange={setInstField('installation_id')}
+            required fullWidth type="number" helperText="Find this in your GitHub App's installation settings URL" />
+          <TextField label="Account Login" value={instForm.account_login} onChange={setInstField('account_login')}
+            required fullWidth helperText="Organization or user name where the app is installed" />
+          <TextField label="Account Type" value={instForm.account_type} onChange={setInstField('account_type')} select fullWidth>
+            <MenuItem value="Organization">Organization</MenuItem>
+            <MenuItem value="User">User</MenuItem>
+          </TextField>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setInstDialogOpen(false)}>Cancel</Button>
+          <Button variant="contained" onClick={handleAddInstallation}
+            disabled={!instForm.installation_id || !instForm.account_login}>Save</Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Installation Delete Confirmation */}
+      <Dialog open={!!instDeleteConfirm} onClose={() => setInstDeleteConfirm(null)}>
+        <DialogTitle>Remove Installation</DialogTitle>
+        <DialogContent>
+          <Typography>Are you sure you want to remove this installation?</Typography>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setInstDeleteConfirm(null)}>Cancel</Button>
+          <Button color="error" variant="contained" onClick={() => handleDeleteInstallation(instDeleteConfirm)}>Remove</Button>
+        </DialogActions>
+      </Dialog>
 
       {/* Repository Add/Edit Dialog */}
       <Dialog open={repoDialogOpen} onClose={() => setRepoDialogOpen(false)} maxWidth="sm" fullWidth>
