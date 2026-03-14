@@ -2,31 +2,45 @@
 
 import json
 import logging
+import time
 import urllib.error
 import urllib.request
 
+import jwt
+
 logger = logging.getLogger(__name__)
+
+
+def _get_installation_token(app_id: int, private_key: str, installation_id: int) -> str:
+    """Generate a GitHub App installation access token.
+
+    Creates a JWT signed with the app's private key, then exchanges it
+    for a short-lived installation access token via the GitHub API.
+    """
+    now = int(time.time())
+    payload = {
+        "iat": now - 60,
+        "exp": now + (10 * 60),
+        "iss": str(app_id),
+    }
+    jwt_token = jwt.encode(payload, private_key, algorithm="RS256")
+
+    url = f"https://api.github.com/app/installations/{installation_id}/access_tokens"
+    req = urllib.request.Request(url, method="POST")
+    req.add_header("Authorization", f"Bearer {jwt_token}")
+    req.add_header("Accept", "application/vnd.github.v3+json")
+    req.add_header("User-Agent", "sahayakan-ingestion")
+    with urllib.request.urlopen(req) as resp:
+        data = json.loads(resp.read().decode())
+    return data["token"]
 
 
 def _fetch_installation_repos(app_id: int, private_key: str, installation_id: int) -> list[dict]:
     """Fetch all repositories accessible to a GitHub App installation.
 
-    Uses the GitHubAppTokenProvider to get an installation token,
-    then paginates through GET /installation/repositories.
-
     This is a blocking call (uses urllib); wrap with asyncio.to_thread() in async contexts.
     """
-    import sys
-    from pathlib import Path
-
-    project_root = Path(__file__).parent.parent.parent.parent.parent
-    for p in [str(project_root), str(project_root / "data-plane")]:
-        if p not in sys.path:
-            sys.path.insert(0, p)
-    from ingestion.github_fetcher.token_provider import GitHubAppTokenProvider
-
-    provider = GitHubAppTokenProvider(app_id, private_key, installation_id)
-    token = provider.get_token()
+    token = _get_installation_token(app_id, private_key, installation_id)
 
     all_repos = []
     page = 1
