@@ -130,9 +130,7 @@ async def github_webhook(request: Request):
         account_type = account.get("type", "")
 
         # Look up our github_apps row by GitHub's app_id
-        app_row = await pool.fetchrow(
-            "SELECT id FROM github_apps WHERE app_id = $1", app_id
-        )
+        app_row = await pool.fetchrow("SELECT id FROM github_apps WHERE app_id = $1", app_id)
         if app_row:
             github_app_id = app_row["id"]
             if action == "created":
@@ -144,7 +142,10 @@ async def github_webhook(request: Request):
                         SET account_login = EXCLUDED.account_login,
                             account_type = EXCLUDED.account_type,
                             is_active = true""",
-                    github_app_id, installation_id, account_login, account_type,
+                    github_app_id,
+                    installation_id,
+                    account_login,
+                    account_type,
                 )
                 events_published.append("installation.registered")
             elif action == "deleted":
@@ -157,7 +158,8 @@ async def github_webhook(request: Request):
                 is_active = action == "unsuspend"
                 await pool.execute(
                     "UPDATE github_app_installations SET is_active = $1 WHERE installation_id = $2",
-                    is_active, installation_id,
+                    is_active,
+                    installation_id,
                 )
                 events_published.append(f"installation.{'resumed' if is_active else 'suspended'}")
 
