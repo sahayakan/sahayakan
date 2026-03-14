@@ -111,8 +111,8 @@ jobs:
           curl -sf -o /dev/null http://localhost:3000 || { echo "web-ui health failed"; false; }
           echo "web-ui OK"
 
-          # Catch any config changes (new services, updated depends_on, etc.)
-          docker compose -f docker-compose.prod.yml --env-file ../.env up -d
+          # Catch any config changes (restart app services only, not stateful ones)
+          docker compose -f docker-compose.prod.yml --env-file ../.env up -d --no-deps --no-build api-server web-ui
 
           # Cleanup
           docker image prune -f
