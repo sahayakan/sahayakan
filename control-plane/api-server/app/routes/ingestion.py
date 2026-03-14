@@ -124,14 +124,34 @@ async def github_status():
 
 @router.post("/jira/sync")
 async def jira_sync(request: JiraSyncRequest):
-    jira_url = os.environ.get("JIRA_URL")
     jira_email = os.environ.get("JIRA_EMAIL")
     jira_token = os.environ.get("JIRA_API_TOKEN")
 
-    if not all([jira_url, jira_email, jira_token]):
+    if not all([jira_email, jira_token]):
         raise HTTPException(
             status_code=500,
-            detail="JIRA_URL, JIRA_EMAIL, and JIRA_API_TOKEN must be set",
+            detail="JIRA_EMAIL and JIRA_API_TOKEN must be set",
+        )
+
+    # Look up per-project base_url from DB, fall back to JIRA_URL env var
+    jira_url = os.environ.get("JIRA_URL")
+    try:
+        from app.database import get_pool
+
+        pool = await get_pool()
+        row = await pool.fetchrow(
+            "SELECT base_url FROM jira_projects WHERE project_key = $1",
+            request.project_key,
+        )
+        if row and row["base_url"]:
+            jira_url = row["base_url"]
+    except Exception:
+        pass  # DB lookup failed, fall back to env var
+
+    if not jira_url:
+        raise HTTPException(
+            status_code=500,
+            detail="No Jira URL configured for this project and JIRA_URL env var is not set",
         )
 
     try:

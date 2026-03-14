@@ -7,7 +7,9 @@ import base64
 import json
 import os
 import sys
+import time
 import urllib.error
+import urllib.parse
 import urllib.request
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
@@ -36,15 +38,23 @@ class JiraFetcher:
         self.token = token
         self.cache = knowledge_cache
 
-    def _request(self, endpoint: str) -> dict:
+    def _request(self, endpoint: str, _retries: int = 3) -> dict:
         url = f"{self.base_url}/rest/api/3/{endpoint}"
         req = urllib.request.Request(url)
         credentials = base64.b64encode(f"{self.email}:{self.token}".encode()).decode()
         req.add_header("Authorization", f"Basic {credentials}")
         req.add_header("Accept", "application/json")
         req.add_header("User-Agent", "sahayakan-ingestion")
-        with urllib.request.urlopen(req) as resp:
-            return json.loads(resp.read().decode())
+        for attempt in range(_retries):
+            try:
+                with urllib.request.urlopen(req) as resp:
+                    return json.loads(resp.read().decode())
+            except urllib.error.HTTPError as e:
+                if e.code == 429 and attempt < _retries - 1:
+                    retry_after = int(e.headers.get("Retry-After", 10))
+                    time.sleep(retry_after)
+                else:
+                    raise
 
     def sync_project(self, project_key: str) -> SyncResult:
         """Sync all tickets from a Jira project."""
@@ -56,8 +66,9 @@ class JiraFetcher:
 
             while True:
                 jql = f"project={project_key} ORDER BY updated DESC"
+                encoded_jql = urllib.parse.quote(jql)
                 endpoint = (
-                    f"search?jql={jql}"
+                    f"search?jql={encoded_jql}"
                     f"&startAt={start_at}&maxResults={max_results}"
                     f"&fields=summary,description,status,priority,"
                     f"assignee,labels,comment,created,updated"
@@ -78,6 +89,8 @@ class JiraFetcher:
                 start_at += len(issues)
                 if start_at >= data.get("total", 0):
                     break
+
+                time.sleep(0.5)
 
         except Exception as e:
             result.errors.append(f"Jira sync failed: {e}")
@@ -138,15 +151,42 @@ class JiraFetcher:
         self.cache.write_json(f"jira/tickets/{issue['key']}.json", ticket_data)
 
     def _extract_adf_text(self, adf: dict) -> str:
-        """Extract plain text from Atlassian Document Format."""
+        """Extract plain text from Atlassian Document Format (recursive)."""
         if isinstance(adf, str):
             return adf
+
+        node_type = adf.get("type")
+
+        # Leaf node: plain text
+        if node_type == "text":
+            return adf.get("text", "")
+
+        # Inline card (link preview) — extract URL
+        if node_type == "inlineCard":
+            return adf.get("attrs", {}).get("url", "")
+
+        # Mention — extract display text
+        if node_type == "mention":
+            return adf.get("attrs", {}).get("text", "")
+
+        # Recurse into children
+        children = adf.get("content", [])
+        if not children:
+            return ""
+
         parts = []
-        for node in adf.get("content", []):
-            if node.get("type") == "paragraph":
-                for inline in node.get("content", []):
-                    if inline.get("type") == "text":
-                        parts.append(inline.get("text", ""))
-            elif node.get("type") == "text":
-                parts.append(node.get("text", ""))
+        for child in children:
+            text = self._extract_adf_text(child)
+            if text:
+                parts.append(text)
+
+        # Join strategy depends on node type
+        if node_type in ("paragraph", "heading", "blockquote", "listItem"):
+            return " ".join(parts)
+        if node_type == "codeBlock":
+            return "\n".join(parts)
+        if node_type in ("bulletList", "orderedList"):
+            return "\n".join(f"- {p}" for p in parts)
+
+        # Default: join with newlines (doc root, table cells, etc.)
         return "\n".join(parts)
