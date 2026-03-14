@@ -40,3 +40,14 @@ class InstallationResponse(BaseModel):
     is_active: bool
     created_at: datetime
     updated_at: datetime
+
+
+class DiscoveredRepo(BaseModel):
+    name: str
+    url: str
+    default_branch: str
+
+
+class DiscoveryResponse(BaseModel):
+    discovered: list[DiscoveredRepo]
+    count: int

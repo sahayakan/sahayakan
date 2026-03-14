@@ -9,12 +9,14 @@ from fastapi import APIRouter, HTTPException
 
 from app.database import get_pool
 from app.models.github_app import (
+    DiscoveryResponse,
     GitHubAppCreate,
     GitHubAppResponse,
     GitHubAppUpdate,
     InstallationCreate,
     InstallationResponse,
 )
+from app.services.github_discovery import discover_repositories
 
 router = APIRouter(prefix="/github-app", tags=["github-app"])
 
@@ -148,6 +150,34 @@ async def remove_installation(app_db_id: int, inst_id: int):
     )
     if result == "DELETE 0":
         raise HTTPException(status_code=404, detail="Installation not found")
+
+
+@router.post("/{app_db_id}/installations/{inst_id}/discover", response_model=DiscoveryResponse)
+async def discover_installation_repos(app_db_id: int, inst_id: int):
+    """Discover repositories accessible to a GitHub App installation and register them."""
+    pool = await get_pool()
+    app_row = await pool.fetchrow(
+        "SELECT id, app_id, private_key_encrypted FROM github_apps WHERE id = $1",
+        app_db_id,
+    )
+    if not app_row:
+        raise HTTPException(status_code=404, detail="GitHub App not found")
+
+    inst_row = await pool.fetchrow(
+        "SELECT id, installation_id FROM github_app_installations WHERE id = $1 AND github_app_id = $2",
+        inst_id,
+        app_db_id,
+    )
+    if not inst_row:
+        raise HTTPException(status_code=404, detail="Installation not found")
+
+    try:
+        repos = await discover_repositories(pool, dict(app_row), dict(inst_row))
+    except urllib.error.HTTPError as e:
+        body = e.read().decode() if e.fp else ""
+        raise HTTPException(status_code=400, detail=f"GitHub API error ({e.code}): {body}") from e
+
+    return {"discovered": repos, "count": len(repos)}
 
 
 @router.post("/{app_db_id}/test")

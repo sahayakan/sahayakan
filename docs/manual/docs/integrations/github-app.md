@@ -78,10 +78,17 @@ After creating the app:
 3. Select **All repositories** or choose specific repositories
 4. Click **Install**
 
-!!! success "Auto-Registration"
-    When someone installs the app, Sahayakan **automatically registers the installation** via webhook. No manual step is needed — the installation ID, account login, and account type are recorded automatically.
+!!! success "Auto-Registration & Repository Discovery"
+    When someone installs the app, Sahayakan **automatically registers the installation** via webhook and **discovers all accessible repositories**. No manual step is needed — the installation, account details, and repositories are recorded automatically.
 
-    The webhook also handles **uninstalls** (soft-deletes the installation), **suspends**, and **unsuspends** (toggles the installation's active status).
+    The webhook also handles **uninstalls** (soft-deletes the installation), **suspends**/**unsuspends** (toggles active status), and **repository changes** (adds/removes repos when the installation's repository access is modified).
+
+    You can manually re-discover repositories at any time via the API:
+
+    ```bash
+    curl -X POST https://<your-domain>/api/github-app/{app_id}/installations/{inst_id}/discover \
+      -u "<basic-auth-user>:<basic-auth-pass>"
+    ```
 
 If auto-registration is not available (e.g., webhooks are not configured), you can register installations manually — see below.
 
@@ -200,10 +207,12 @@ When configured, GitHub sends events to Sahayakan in real time. The following ev
 | `pull_request` | `opened` | `pr.ingested` |
 | `pull_request` | `synchronize`, `edited` | `pr.updated` |
 | `issue_comment` | `created` | `issue.commented` |
-| `installation` | `created` | Auto-registers installation |
+| `installation` | `created` | Auto-registers installation + discovers repos |
 | `installation` | `deleted` | Soft-deletes installation |
 | `installation` | `suspend` | Deactivates installation |
 | `installation` | `unsuspend` | Reactivates installation |
+| `installation_repositories` | `added` | Discovers newly added repos |
+| `installation_repositories` | `removed` | Deactivates removed repos |
 
 ### Webhook Flow
 

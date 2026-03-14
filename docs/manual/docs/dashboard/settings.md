@@ -6,7 +6,10 @@ The Settings page manages repositories, Jira projects, and GitHub App configurat
 
 Add repositories that Sahayakan should analyze.
 
-**Adding a repository:**
+!!! tip "Auto-Discovery for GitHub"
+    GitHub repositories are **automatically discovered** when a GitHub App installation is registered (via webhook or manual re-discovery). You only need to manually add repositories for non-GitHub providers (GitLab, Bitbucket).
+
+**Adding a repository manually:**
 
 1. Click **Add Repository**
 2. Fill in:
