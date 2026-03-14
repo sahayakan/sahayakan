@@ -9,6 +9,7 @@ import AddIcon from '@mui/icons-material/Add';
 import EditIcon from '@mui/icons-material/Edit';
 import DeleteIcon from '@mui/icons-material/Delete';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
+import SyncIcon from '@mui/icons-material/Sync';
 import usePolling from '../hooks/usePolling';
 import { api } from '../api/client';
 
@@ -131,6 +132,21 @@ export default function SettingsPage() {
   const [instDialogOpen, setInstDialogOpen] = useState(false);
   const [instForm, setInstForm] = useState(EMPTY_INSTALLATION_FORM);
   const [instDeleteConfirm, setInstDeleteConfirm] = useState(null);
+  const [discoveringInstId, setDiscoveringInstId] = useState(null);
+  const [discoverResult, setDiscoverResult] = useState(null);
+
+  const handleDiscoverRepos = async (instId) => {
+    setDiscoveringInstId(instId);
+    setDiscoverResult(null);
+    try {
+      const result = await api.post(`/github-app/${instAppId}/installations/${instId}/discover`);
+      setDiscoverResult({ success: true, count: result.discovered });
+      refreshRepos();
+    } catch (err) {
+      setDiscoverResult({ success: false, error: err?.response?.data?.detail || 'Discovery failed' });
+    }
+    setDiscoveringInstId(null);
+  };
 
   const openAddApp = () => {
     setAppEditId(null);
@@ -386,6 +402,10 @@ export default function SettingsPage() {
                     <TableCell><Chip label={inst.account_type} size="small" /></TableCell>
                     <TableCell>{inst.is_active ? <CheckCircleIcon color="success" fontSize="small" /> : 'No'}</TableCell>
                     <TableCell align="right">
+                      <IconButton size="small" title="Discover Repos" onClick={() => handleDiscoverRepos(inst.id)}
+                        disabled={discoveringInstId === inst.id}>
+                        {discoveringInstId === inst.id ? <CircularProgress size={18} /> : <SyncIcon fontSize="small" />}
+                      </IconButton>
                       <IconButton size="small" color="error" onClick={() => setInstDeleteConfirm(inst.id)}>
                         <DeleteIcon fontSize="small" />
                       </IconButton>
@@ -402,6 +422,13 @@ export default function SettingsPage() {
               </TableBody>
             </Table>
           </TableContainer>
+          {discoverResult && (
+            <Alert severity={discoverResult.success ? 'success' : 'error'} sx={{ mt: 1 }} onClose={() => setDiscoverResult(null)}>
+              {discoverResult.success
+                ? `Discovered ${discoverResult.count} repositories`
+                : discoverResult.error}
+            </Alert>
+          )}
         </Box>
       )}
 
