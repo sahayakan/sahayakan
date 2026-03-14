@@ -7,9 +7,10 @@ Read `.env.local` to get SSH_KEY_PATH and AWS_SERVER_IP. Then perform the follow
    ssh -i {SSH_KEY_PATH} admin@{AWS_SERVER_IP} "cd ~/sahayakan && git pull origin main"
    ```
 
-2. **Apply database migrations** (idempotent — errors on existing objects are ignored):
+2. **Apply database migrations** (idempotent — errors on existing objects are ignored).
+   Use `< /dev/null` on docker exec to prevent it from consuming SSH stdin:
    ```
-   ssh -i {SSH_KEY_PATH} admin@{AWS_SERVER_IP} 'for f in /home/admin/sahayakan/infrastructure/db/migrations/*.sql; do echo "  $(basename $f)"; docker exec infrastructure-postgres-1 psql -U sahayakan -d sahayakan -f "/docker-entrypoint-initdb.d/$(basename $f)" -v ON_ERROR_STOP=0 2>&1 | tail -1; done'
+   ssh -i {SSH_KEY_PATH} admin@{AWS_SERVER_IP} 'for f in /home/admin/sahayakan/infrastructure/db/migrations/*.sql; do echo "  $(basename $f)"; docker exec infrastructure-postgres-1 psql -U sahayakan -d sahayakan -f "/docker-entrypoint-initdb.d/$(basename $f)" -v ON_ERROR_STOP=0 < /dev/null 2>&1 | tail -1; done'
    ```
 
 3. **Rebuild services** (api-server and web-ui only, keeps postgres/minio running).

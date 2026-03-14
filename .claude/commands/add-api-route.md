@@ -26,4 +26,4 @@ Steps:
    - Define request/response models in `control-plane/api-server/app/models/` if needed
    - Implement the route handlers
    - Add any required database migrations
-   - **Update the Caddy config on the production server** (`/etc/caddy/Caddyfile` on `ai.helm-team.org`) to add the new route prefix, otherwise the route will not be accessible in production
+   - No Caddy changes needed — production uses `/api/*` prefix routing which covers all API routes automatically
