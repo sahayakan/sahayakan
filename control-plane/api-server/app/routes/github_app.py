@@ -168,7 +168,7 @@ async def test_app_credentials(app_db_id: int):
         payload = {
             "iat": now - 60,
             "exp": now + (10 * 60),
-            "iss": row["app_id"],
+            "iss": str(row["app_id"]),
         }
         token = jwt.encode(payload, row["private_key_encrypted"], algorithm="RS256")
 

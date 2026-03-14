@@ -39,7 +39,7 @@ class GitHubAppTokenProvider(GitHubTokenProvider):
         payload = {
             "iat": now - 60,  # issued at (60s clock drift allowance)
             "exp": now + (10 * 60),  # expires in 10 minutes (max allowed)
-            "iss": self._app_id,
+            "iss": str(self._app_id),
         }
         return jwt.encode(payload, self._private_key, algorithm="RS256")
 
