@@ -25,12 +25,6 @@ class GitHubAppResponse(BaseModel):
     updated_at: datetime
 
 
-class InstallationCreate(BaseModel):
-    installation_id: int
-    account_login: str
-    account_type: str = "Organization"
-
-
 class InstallationResponse(BaseModel):
     id: int
     github_app_id: int

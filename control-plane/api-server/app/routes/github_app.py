@@ -13,7 +13,6 @@ from app.models.github_app import (
     GitHubAppCreate,
     GitHubAppResponse,
     GitHubAppUpdate,
-    InstallationCreate,
     InstallationResponse,
 )
 from app.services.github_discovery import discover_repositories
@@ -112,32 +111,6 @@ async def list_installations(app_db_id: int):
         app_db_id,
     )
     return [dict(row) for row in rows]
-
-
-@router.post("/{app_db_id}/installations", response_model=InstallationResponse, status_code=201)
-async def add_installation(app_db_id: int, inst: InstallationCreate):
-    pool = await get_pool()
-    existing = await pool.fetchrow("SELECT id FROM github_apps WHERE id = $1", app_db_id)
-    if not existing:
-        raise HTTPException(status_code=404, detail="GitHub App not found")
-
-    try:
-        row = await pool.fetchrow(
-            "INSERT INTO github_app_installations "
-            "(github_app_id, installation_id, account_login, account_type) "
-            "VALUES ($1, $2, $3, $4) "
-            "RETURNING id, github_app_id, installation_id, account_login, account_type, "
-            "is_active, created_at, updated_at",
-            app_db_id,
-            inst.installation_id,
-            inst.account_login,
-            inst.account_type,
-        )
-    except Exception as e:
-        if "unique" in str(e).lower():
-            raise HTTPException(status_code=409, detail=f"Installation {inst.installation_id} already exists") from e
-        raise
-    return dict(row)
 
 
 @router.delete("/{app_db_id}/installations/{inst_id}", status_code=204)
