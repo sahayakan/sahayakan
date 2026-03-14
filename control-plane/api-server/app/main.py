@@ -53,8 +53,8 @@ class AuthMiddleware(BaseHTTPMiddleware):
         if request.url.path in PUBLIC_ROUTES:
             return await call_next(request)
 
-        # Allow WebSocket upgrade without middleware interception
-        if request.url.path.startswith("/ws"):
+        # Allow WebSocket and webhook paths through (they handle their own auth)
+        if request.url.path.startswith("/ws") or request.url.path.startswith("/webhooks"):
             return await call_next(request)
 
         auth_header = request.headers.get("authorization", "")
