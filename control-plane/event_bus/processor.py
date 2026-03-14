@@ -2,8 +2,19 @@
 
 import asyncio
 import json
+import sys
+from pathlib import Path
 
 import asyncpg
+
+# Add control-plane to path for structured_log import
+_cp_root = str(Path(__file__).parent.parent / "api-server")
+if _cp_root not in sys.path:
+    sys.path.insert(0, _cp_root)
+
+from app.structured_log import get_logger  # noqa: E402
+
+_log = get_logger("event_bus")
 
 
 class EventBusProcessor:
@@ -15,18 +26,18 @@ class EventBusProcessor:
 
     async def start(self) -> None:
         self.running = True
-        print("[EventBus] Started polling for events", flush=True)
+        _log.info("Started polling for events")
         await self._register_default_subscriptions()
         while self.running:
             try:
                 await self._process_events()
             except Exception as e:
-                print(f"[EventBus] Error: {e}", flush=True)
+                _log.error(f"Error: {e}")
             await asyncio.sleep(self.POLL_INTERVAL)
 
     async def stop(self) -> None:
         self.running = False
-        print("[EventBus] Stopped", flush=True)
+        _log.info("Stopped")
 
     async def _register_default_subscriptions(self) -> None:
         """Register default event subscriptions for MVP agents."""
@@ -46,7 +57,7 @@ class EventBusProcessor:
                     agent_name,
                     event_type,
                 )
-        print("[EventBus] Default subscriptions registered", flush=True)
+        _log.info("Default subscriptions registered")
 
     async def _process_events(self) -> None:
         # Fetch unprocessed events
@@ -93,10 +104,7 @@ class EventBusProcessor:
                     agent_name,
                     json.dumps(job_params),
                 )
-                print(
-                    f"[EventBus] Event '{event_type}' -> created job for '{agent_name}'",
-                    flush=True,
-                )
+                _log.info(f"Event '{event_type}' -> created job for '{agent_name}'")
 
             # Mark event as processed
             await self.pool.execute(

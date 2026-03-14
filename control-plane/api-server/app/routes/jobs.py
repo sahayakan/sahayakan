@@ -1,15 +1,20 @@
 import json
+from typing import Annotated
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 
+from app.auth import AuthContext, get_auth_context, log_audit
 from app.database import get_pool
 from app.models.jobs import JobCreate, JobResponse
+from app.request_context import get_request_id
+
+CurrentAuth = Annotated[AuthContext, Depends(get_auth_context)]
 
 router = APIRouter(prefix="/jobs", tags=["jobs"])
 
 
 @router.post("/run", response_model=JobResponse, status_code=201)
-async def create_job(job: JobCreate):
+async def create_job(job: JobCreate, auth: CurrentAuth):
     pool = await get_pool()
 
     # Verify agent exists
@@ -20,17 +25,21 @@ async def create_job(job: JobCreate):
             detail=f"Agent '{job.agent}' not found. Register the agent first.",
         )
 
+    request_id = get_request_id()
     row = await pool.fetchrow(
-        "INSERT INTO jobs (agent_name, status, parameters) "
-        "VALUES ($1, 'pending', $2::jsonb) "
+        "INSERT INTO jobs (agent_name, status, parameters, request_id) "
+        "VALUES ($1, 'pending', $2::jsonb, $3) "
         "RETURNING id, agent_name, status, parameters, "
         "created_at, started_at, completed_at",
         job.agent,
         json.dumps(job.parameters),
+        request_id or None,
     )
     result = dict(row)
     if isinstance(result["parameters"], str):
         result["parameters"] = json.loads(result["parameters"])
+
+    await log_audit(pool, auth, "job.created", "job", str(result["id"]))
     return result
 
 

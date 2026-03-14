@@ -1,7 +1,12 @@
-from fastapi import APIRouter, HTTPException
+from typing import Annotated
 
+from fastapi import APIRouter, Depends, HTTPException
+
+from app.auth import AuthContext, get_auth_context, log_audit
 from app.database import get_pool
 from app.models.agents import AgentRegister, AgentResponse
+
+CurrentAuth = Annotated[AuthContext, Depends(get_auth_context)]
 
 router = APIRouter(prefix="/agents", tags=["agents"])
 
@@ -29,7 +34,7 @@ async def get_agent(name: str):
 
 
 @router.post("/register", response_model=AgentResponse, status_code=201)
-async def register_agent(agent: AgentRegister):
+async def register_agent(agent: AgentRegister, auth: CurrentAuth):
     pool = await get_pool()
     try:
         row = await pool.fetchrow(
@@ -49,4 +54,5 @@ async def register_agent(agent: AgentRegister):
                 detail=f"Agent '{agent.name}' already registered",
             ) from e
         raise
+    await log_audit(pool, auth, "agent.registered", "agent", agent.name)
     return dict(row)

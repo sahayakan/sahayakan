@@ -404,6 +404,34 @@ Monitor disk usage: `df -h / /data` and `docker system df`
 - [x] Attach EBS volume (`vol-0d5c096c225e7d210`, 100GB) mounted at `/data`
 - [x] Enable authentication — `AUTH_ENABLED=true`, admin API key created
 
+## Observability
+
+### Health Check Cron
+
+A health check script runs every 5 minutes, checking API health, disk usage, and backup recency:
+
+```bash
+crontab -e
+# Add: */5 * * * * /home/admin/sahayakan/infrastructure/scripts/health_check.sh
+```
+
+Alerts are written to `/var/log/sahayakan-alerts.log`. The script checks:
+- `/health` endpoint for degraded status (DB, MinIO)
+- Disk usage on `/` and `/data` (threshold: 90%)
+- Backup recency in `/data/backups` (threshold: 25 hours)
+
+### Prometheus
+
+Prometheus scrapes metrics from the API server every 30 seconds. It runs as a Docker service
+bound to `127.0.0.1:9090` (not publicly accessible). Access via SSH tunnel:
+
+```bash
+ssh -L 9090:localhost:9090 -i ~/.ssh/baijumk1.pem admin@13.126.248.229
+# Then open http://localhost:9090 in browser
+```
+
+Data retention: 30 days. Memory limit: 256MB.
+
 ## Authentication
 
 Two layers of auth protect the site:

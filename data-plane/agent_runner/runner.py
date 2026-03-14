@@ -9,6 +9,9 @@ import asyncpg
 from agent_runner.contracts.base_agent import AgentInput, BaseAgent
 from agent_runner.knowledge import KnowledgeCache
 from agent_runner.logging_utils import AgentLogger
+from agent_runner.structured_log import get_logger
+
+_log = get_logger("runner")
 
 
 class AgentRunner:
@@ -33,7 +36,7 @@ class AgentRunner:
     async def start(self) -> None:
         self.running = True
         self._current_job_id = None
-        print("[Runner] Started polling for jobs", flush=True)
+        _log.info("Started polling for jobs")
 
         # Recover stale running jobs from previous crashes
         await self._recover_stale_jobs()
@@ -42,14 +45,14 @@ class AgentRunner:
             try:
                 await self._poll_and_execute()
             except Exception as e:
-                print(f"[Runner] Poll error: {e}", flush=True)
+                _log.error(f"Poll error: {e}")
             await asyncio.sleep(self.POLL_INTERVAL)
 
     async def stop(self) -> None:
         self.running = False
         if self._current_job_id:
-            print(f"[Runner] Graceful shutdown: waiting for job {self._current_job_id}", flush=True)
-        print("[Runner] Stopped", flush=True)
+            _log.info(f"Graceful shutdown: waiting for job {self._current_job_id}")
+        _log.info("Stopped")
 
     async def _recover_stale_jobs(self) -> None:
         """Reset jobs stuck in 'running' status from a previous crash."""
@@ -60,7 +63,7 @@ class AgentRunner:
                 row["id"],
             )
         if rows:
-            print(f"[Runner] Recovered {len(rows)} stale job(s)", flush=True)
+            _log.info(f"Recovered {len(rows)} stale job(s)")
 
     async def _poll_and_execute(self) -> None:
         row = await self.pool.fetchrow(

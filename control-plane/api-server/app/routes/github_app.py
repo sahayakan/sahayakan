@@ -4,9 +4,11 @@ import json
 import time
 import urllib.error
 import urllib.request
+from typing import Annotated
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 
+from app.auth import AuthContext, get_auth_context, log_audit
 from app.database import get_pool
 from app.models.github_app import (
     DiscoveryResponse,
@@ -16,6 +18,8 @@ from app.models.github_app import (
     InstallationResponse,
 )
 from app.services.github_discovery import discover_repositories
+
+CurrentAuth = Annotated[AuthContext, Depends(get_auth_context)]
 
 router = APIRouter(prefix="/github-app", tags=["github-app"])
 
@@ -30,7 +34,7 @@ async def list_apps():
 
 
 @router.post("", response_model=GitHubAppResponse, status_code=201)
-async def create_app(app: GitHubAppCreate):
+async def create_app(app: GitHubAppCreate, auth: CurrentAuth):
     pool = await get_pool()
     try:
         row = await pool.fetchrow(
@@ -46,6 +50,7 @@ async def create_app(app: GitHubAppCreate):
         if "unique" in str(e).lower():
             raise HTTPException(status_code=409, detail=f"GitHub App {app.app_id} already exists") from e
         raise
+    await log_audit(pool, auth, "github_app.created", "github_app", str(row["id"]))
     return dict(row)
 
 
@@ -94,11 +99,12 @@ async def update_app(app_db_id: int, app: GitHubAppUpdate):
 
 
 @router.delete("/{app_db_id}", status_code=204)
-async def delete_app(app_db_id: int):
+async def delete_app(app_db_id: int, auth: CurrentAuth):
     pool = await get_pool()
     result = await pool.execute("DELETE FROM github_apps WHERE id = $1", app_db_id)
     if result == "DELETE 0":
         raise HTTPException(status_code=404, detail="GitHub App not found")
+    await log_audit(pool, auth, "github_app.deleted", "github_app", str(app_db_id))
 
 
 @router.get("/{app_db_id}/installations", response_model=list[InstallationResponse])

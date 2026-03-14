@@ -3,15 +3,15 @@
 import hashlib
 import hmac
 import json
-import logging
 import os
 
 from fastapi import APIRouter, HTTPException, Request
 
 from app.database import get_pool
 from app.services.github_discovery import deactivate_repositories, discover_repositories
+from app.structured_log import get_logger
 
-logger = logging.getLogger(__name__)
+logger = get_logger("webhooks")
 
 router = APIRouter(prefix="/webhooks", tags=["webhooks"])
 
@@ -169,7 +169,7 @@ async def github_webhook(request: Request):
                         repos = await discover_repositories(pool, dict(app_full), dict(inst_row))
                         events_published.append(f"repos.discovered:{len(repos)}")
                 except Exception:
-                    logger.exception("Failed to auto-discover repositories for installation %s", installation_id)
+                    logger.error(f"Failed to auto-discover repositories for installation {installation_id}")
 
             elif action == "deleted":
                 await pool.execute(
@@ -210,7 +210,7 @@ async def github_webhook(request: Request):
                     repos = await discover_repositories(pool, app_info, inst_info)
                     events_published.append(f"repos.added:{len(repos)}")
                 except Exception:
-                    logger.exception("Failed to discover added repositories for installation %s", installation_id)
+                    logger.error(f"Failed to discover added repositories for installation {installation_id}")
             elif action == "removed":
                 removed_repos = payload.get("repositories_removed", [])
                 repo_names = [r.get("full_name", "") for r in removed_repos if r.get("full_name")]
@@ -219,9 +219,7 @@ async def github_webhook(request: Request):
                         await deactivate_repositories(pool, repo_names, inst_row["id"])
                         events_published.append(f"repos.removed:{len(repo_names)}")
                     except Exception:
-                        logger.exception(
-                            "Failed to deactivate removed repositories for installation %s", installation_id
-                        )
+                        logger.error(f"Failed to deactivate removed repositories for installation {installation_id}")
 
     return {
         "status": "ok",

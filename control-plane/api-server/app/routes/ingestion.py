@@ -8,11 +8,16 @@ the project root or run the API server directly.
 import os
 import sys
 from pathlib import Path
+from typing import Annotated
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 
+from app.auth import AuthContext, get_auth_context, log_audit
 from app.config import settings
+from app.database import get_pool
+
+CurrentAuth = Annotated[AuthContext, Depends(get_auth_context)]
 
 router = APIRouter(prefix="/ingestion", tags=["ingestion"])
 
@@ -57,8 +62,6 @@ async def _resolve_token_provider(owner: str, repo: str):
     _setup_paths()
     from ingestion.github_fetcher.token_provider import GitHubAppTokenProvider
 
-    from app.database import get_pool
-
     pool = await get_pool()
     row = await pool.fetchrow(
         "SELECT r.github_installation_id, "
@@ -83,7 +86,7 @@ async def _resolve_token_provider(owner: str, repo: str):
 
 
 @router.post("/github/sync")
-async def github_sync(request: GitHubSyncRequest):
+async def github_sync(request: GitHubSyncRequest, auth: CurrentAuth):
     try:
         _setup_paths()
         from ingestion.github_fetcher.fetcher import GitHubFetcher
@@ -102,6 +105,9 @@ async def github_sync(request: GitHubSyncRequest):
         repo=request.repo,
         since=request.since,
     )
+
+    pool = await get_pool()
+    await log_audit(pool, auth, "ingestion.github_sync", "repository", f"{request.owner}/{request.repo}")
 
     return {
         "status": "completed" if not result.errors else "completed_with_errors",
@@ -123,7 +129,7 @@ async def github_status():
 
 
 @router.post("/jira/sync")
-async def jira_sync(request: JiraSyncRequest):
+async def jira_sync(request: JiraSyncRequest, auth: CurrentAuth):
     jira_email = os.environ.get("JIRA_EMAIL")
     jira_token = os.environ.get("JIRA_API_TOKEN")
 
@@ -136,8 +142,6 @@ async def jira_sync(request: JiraSyncRequest):
     # Look up per-project base_url from DB, fall back to JIRA_URL env var
     jira_url = os.environ.get("JIRA_URL")
     try:
-        from app.database import get_pool
-
         pool = await get_pool()
         row = await pool.fetchrow(
             "SELECT base_url FROM jira_projects WHERE project_key = $1",
@@ -173,6 +177,9 @@ async def jira_sync(request: JiraSyncRequest):
 
     result = fetcher.sync_project(project_key=request.project_key)
 
+    pool = await get_pool()
+    await log_audit(pool, auth, "ingestion.jira_sync", "jira_project", request.project_key)
+
     return {
         "status": "completed" if not result.errors else "completed_with_errors",
         "tickets_synced": result.tickets_synced,
@@ -190,7 +197,7 @@ async def jira_status():
 
 
 @router.post("/slack/sync")
-async def slack_sync(request: SlackSyncRequest):
+async def slack_sync(request: SlackSyncRequest, auth: CurrentAuth):
     token = os.environ.get("SLACK_BOT_TOKEN")
     if not token:
         raise HTTPException(status_code=500, detail="SLACK_BOT_TOKEN not set")
@@ -211,8 +218,6 @@ async def slack_sync(request: SlackSyncRequest):
 
     # Publish slack.synced event
     try:
-        from app.database import get_pool
-
         pool = await get_pool()
         import json as _json
 
@@ -222,6 +227,9 @@ async def slack_sync(request: SlackSyncRequest):
         )
     except Exception:
         pass
+
+    pool = await get_pool()
+    await log_audit(pool, auth, "ingestion.slack_sync", "slack_channel", request.channel_name)
 
     return {
         "status": "completed" if not result.errors else "completed_with_errors",

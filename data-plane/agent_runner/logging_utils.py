@@ -4,14 +4,16 @@ from datetime import UTC, datetime
 
 
 class AgentLogger:
-    def __init__(self, job_id: int | None = None):
+    def __init__(self, job_id: int | None = None, request_id: str = ""):
         self.job_id = job_id
+        self.request_id = request_id
         self._lines: list[str] = []
 
     def _format(self, level: str, message: str) -> str:
         ts = datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%S.%fZ")
         job_part = f" [{self.job_id}]" if self.job_id is not None else ""
-        return f"[{level}]  [{ts}]{job_part} {message}"
+        req_part = f" [req:{self.request_id}]" if self.request_id else ""
+        return f"[{level}]  [{ts}]{job_part}{req_part} {message}"
 
     def _emit(self, line: str) -> None:
         self._lines.append(line)
