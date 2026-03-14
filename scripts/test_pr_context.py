@@ -19,6 +19,7 @@ from agent_runner.logging_utils import AgentLogger
 from agents.issue_triage.agent import IssueTriageAgent
 from agents.pr_context.agent import PRContextAgent
 from ingestion.github_fetcher.fetcher import GitHubFetcher
+from ingestion.github_fetcher.token_provider import GitHubTokenProvider
 from llm_client.base import LLMClient, LLMResponse
 
 
@@ -61,16 +62,20 @@ class GeminiAPIClient(LLMClient):
         )
 
 
-def main():
-    # Get tokens
-    token = os.environ.get("GITHUB_TOKEN")
-    if not token:
-        result = subprocess.run(["gh", "auth", "token"], capture_output=True, text=True)
-        token = result.stdout.strip()
-    if not token:
-        print("ERROR: No GitHub token available")
-        sys.exit(1)
+class CLITokenProvider(GitHubTokenProvider):
+    """Token provider that uses `gh auth token` for local dev/test."""
 
+    def get_token(self) -> str:
+        token = os.environ.get("GITHUB_TOKEN")
+        if not token:
+            result = subprocess.run(["gh", "auth", "token"], capture_output=True, text=True)
+            token = result.stdout.strip()
+        if not token:
+            raise RuntimeError("No GitHub token available (set GITHUB_TOKEN or install gh CLI)")
+        return token
+
+
+def main():
     gemini_key = os.environ.get("GEMINI_API_KEY")
     if not gemini_key:
         print("ERROR: GEMINI_API_KEY not set")
@@ -89,7 +94,7 @@ def main():
     print("STEP 1: Ingesting from sahayakan/test-project")
     print("=" * 60)
 
-    fetcher = GitHubFetcher(token=token, knowledge_cache=cache)
+    fetcher = GitHubFetcher(token_provider=CLITokenProvider(), knowledge_cache=cache)
     result = fetcher.sync_repo(owner="sahayakan", repo="test-project")
     print(f"Issues synced: {result.issues_synced}")
     print(f"PRs synced: {result.prs_synced}")

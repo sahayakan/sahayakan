@@ -339,7 +339,7 @@ export default function SettingsPage() {
             {githubApps && githubApps.length === 0 && (
               <TableRow>
                 <TableCell colSpan={5} align="center" sx={{ color: 'text.secondary', py: 4 }}>
-                  No GitHub App configured. Using PAT authentication.
+                  No GitHub App configured. Add one to enable GitHub sync.
                 </TableCell>
               </TableRow>
             )}

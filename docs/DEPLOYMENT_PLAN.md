@@ -78,7 +78,6 @@ Key values to set:
 |---|---|
 | `POSTGRES_PASSWORD` | Generate strong password: `openssl rand -base64 24` |
 | `MINIO_ROOT_PASSWORD` | Generate strong password |
-| `GITHUB_TOKEN` | Personal access token with repo scope |
 | `AUTH_ENABLED` | `true` for production |
 
 ### 2.3 Start Services
@@ -435,8 +434,6 @@ To set up a GitHub App:
    - Use "Test Connection" to verify credentials
 
 5. **Link repositories**: Edit a repository in Settings and set auth mode to "app" with the installation
-
-PAT authentication remains as a fallback when no GitHub App is configured for a repository.
 
 To create additional keys (requires the admin key):
 

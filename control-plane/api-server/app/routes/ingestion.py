@@ -49,44 +49,37 @@ def _get_knowledge_cache():
 
 
 async def _resolve_token_provider(owner: str, repo: str):
-    """Resolve a GitHubTokenProvider based on repository auth_mode.
+    """Resolve a GitHubTokenProvider for the given repository.
 
-    Checks the repositories table for a GitHub App installation link.
-    Falls back to GITHUB_TOKEN env var (PAT) if no app is configured.
+    Looks up the repository's linked GitHub App installation.
+    Raises HTTP 400 if no GitHub App installation is configured.
     """
     _setup_paths()
-    from ingestion.github_fetcher.token_provider import GitHubAppTokenProvider, PATTokenProvider
+    from ingestion.github_fetcher.token_provider import GitHubAppTokenProvider
 
-    try:
-        from app.database import get_pool
+    from app.database import get_pool
 
-        pool = await get_pool()
-        row = await pool.fetchrow(
-            "SELECT r.auth_mode, r.github_installation_id, "
-            "i.installation_id, ga.app_id, ga.private_key_encrypted "
-            "FROM repositories r "
-            "LEFT JOIN github_app_installations i ON r.github_installation_id = i.id "
-            "LEFT JOIN github_apps ga ON i.github_app_id = ga.id "
-            "WHERE r.url LIKE $1 AND r.is_active = true",
-            f"%{owner}/{repo}%",
-        )
-        if row and row["auth_mode"] == "app" and row["installation_id"]:
-            return GitHubAppTokenProvider(
-                app_id=row["app_id"],
-                private_key=row["private_key_encrypted"],
-                installation_id=row["installation_id"],
-            )
-    except Exception:
-        pass
-
-    # Fallback to PAT
-    token = os.environ.get("GITHUB_TOKEN")
-    if not token:
+    pool = await get_pool()
+    row = await pool.fetchrow(
+        "SELECT r.github_installation_id, "
+        "i.installation_id, ga.app_id, ga.private_key_encrypted "
+        "FROM repositories r "
+        "LEFT JOIN github_app_installations i ON r.github_installation_id = i.id "
+        "LEFT JOIN github_apps ga ON i.github_app_id = ga.id "
+        "WHERE r.url LIKE $1 AND r.is_active = true",
+        f"%{owner}/{repo}%",
+    )
+    if not row or not row["installation_id"]:
         raise HTTPException(
-            status_code=500,
-            detail="No GitHub App configured for this repo and GITHUB_TOKEN not set",
+            status_code=400,
+            detail="No GitHub App installation configured for this repository. "
+            "Add a GitHub App and link it in Settings.",
         )
-    return PATTokenProvider(token)
+    return GitHubAppTokenProvider(
+        app_id=row["app_id"],
+        private_key=row["private_key_encrypted"],
+        installation_id=row["installation_id"],
+    )
 
 
 @router.post("/github/sync")

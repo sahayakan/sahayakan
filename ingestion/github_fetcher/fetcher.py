@@ -14,7 +14,7 @@ from datetime import UTC, datetime
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "..", "data-plane"))
 from agent_runner.knowledge import KnowledgeCache
-from ingestion.github_fetcher.token_provider import GitHubTokenProvider, PATTokenProvider
+from ingestion.github_fetcher.token_provider import GitHubTokenProvider
 
 
 @dataclass
@@ -31,15 +31,9 @@ class GitHubFetcher:
     def __init__(
         self,
         knowledge_cache: KnowledgeCache,
-        token: str | None = None,
-        token_provider: GitHubTokenProvider | None = None,
+        token_provider: GitHubTokenProvider,
     ):
-        if token_provider:
-            self.token_provider = token_provider
-        elif token:
-            self.token_provider = PATTokenProvider(token)
-        else:
-            raise ValueError("Either token or token_provider must be provided")
+        self.token_provider = token_provider
         self.cache = knowledge_cache
 
     def _request(self, url: str) -> dict | list:

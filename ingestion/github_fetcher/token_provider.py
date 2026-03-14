@@ -16,16 +16,6 @@ class GitHubTokenProvider(ABC):
         """Return a valid GitHub API token."""
 
 
-class PATTokenProvider(GitHubTokenProvider):
-    """Wraps a static Personal Access Token."""
-
-    def __init__(self, token: str):
-        self._token = token
-
-    def get_token(self) -> str:
-        return self._token
-
-
 class GitHubAppTokenProvider(GitHubTokenProvider):
     """Generates installation access tokens via GitHub App JWT auth.
 
