@@ -140,7 +140,7 @@ export default function SettingsPage() {
     setDiscoverResult(null);
     try {
       const result = await api.post(`/github-app/${instAppId}/installations/${instId}/discover`);
-      setDiscoverResult({ success: true, count: result.discovered });
+      setDiscoverResult({ success: true, count: result.count });
       refreshRepos();
     } catch (err) {
       setDiscoverResult({ success: false, error: err?.response?.data?.detail || 'Discovery failed' });

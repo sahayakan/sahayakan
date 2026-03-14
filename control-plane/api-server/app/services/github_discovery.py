@@ -17,8 +17,12 @@ def _fetch_installation_repos(app_id: int, private_key: str, installation_id: in
     This is a blocking call (uses urllib); wrap with asyncio.to_thread() in async contexts.
     """
     import sys
+    from pathlib import Path
 
-    sys.path.insert(0, "data-plane")
+    project_root = Path(__file__).parent.parent.parent.parent.parent
+    for p in [str(project_root), str(project_root / "data-plane")]:
+        if p not in sys.path:
+            sys.path.insert(0, p)
     from ingestion.github_fetcher.token_provider import GitHubAppTokenProvider
 
     provider = GitHubAppTokenProvider(app_id, private_key, installation_id)
